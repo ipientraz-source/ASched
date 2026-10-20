@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, Select, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
 import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
@@ -30,11 +30,7 @@ function useRange() {
     mode === 'harian' ? [ref, ref] : mode === 'mingguan' ? [monday(ref), addDays(monday(ref), 6)] : [ref.slice(0, 8) + '01', lastOfMonth(ref)]
   const ui = (
     <div className="flex flex-wrap gap-2 items-center mb-3">
-      <select className="inp" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
-        <option value="harian">Harian</option>
-        <option value="mingguan">Mingguan (Sen–Min)</option>
-        <option value="bulanan">Bulanan</option>
-      </select>
+      <Select className="w-52" value={mode} onChange={(v) => setMode(v as typeof mode)} opsi={[{ value: 'harian', label: 'Harian' }, { value: 'mingguan', label: 'Mingguan (Senin–Minggu)' }, { value: 'bulanan', label: 'Bulanan' }]} />
       <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
       <span className="text-sm text-muted-foreground">
         {from} s/d {to}
@@ -241,12 +237,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
       {ui}
       <div className="flex flex-wrap gap-2 mb-3">
         {sup && (
-          <select className="inp" value={dsf} onChange={(e) => setDsf(e.target.value)}>
-            <option value="">Semua DS</option>
-            {dsl.rows.map((x) => (
-              <option key={x.id} value={x.id}>{x.nama}</option>
-            ))}
-          </select>
+          <Select className="w-56" value={dsf} onChange={setDsf} opsi={[{ value: '', label: 'Semua DS' }, ...dsl.rows.map((x) => ({ value: x.id, label: x.nama }))]} />
         )}
         <input className="inp" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         <button className="btn2 ml-auto" onClick={() => download(`rekap-rider_${from}_${to}.csv`, toCsv(rRows as unknown as Record<string, unknown>[]))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh rekap rider</button>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, type Ds, type Me, type Rider } from './lib'
 
 type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null }
 type Catat = (rider: string, status: string, backup?: string, teks?: string) => Promise<boolean>
@@ -150,13 +150,7 @@ function Baris({
       </div>
       {buka && (
         <div className="mt-2 pt-2 border-t flex flex-wrap gap-2 items-center">
-          <select className="inp" value={alasan} onChange={(e) => setAlasan(e.target.value)}>
-            {ALASAN.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
+          <Select className="w-72 max-w-full" value={alasan} onChange={setAlasan} opsi={ALASAN.map(([value, label]) => ({ value, label }))} />
           {(alasan === 'alpha' || alasan === 'tukar') && (
             <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Pengganti / backup (opsional)'} />
           )}

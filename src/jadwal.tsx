@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Copy, Sparkles } from 'lucide-react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, type Ds, type Me, type Rider } from './lib'
 import { buatDraf } from './otomatis'
+
+const SIKLUS = ['', 'pagi', 'siang'] // urutan ganti saat sel diklik
 
 // Grid jadwal 1 DS × 1 minggu (Senin–Minggu). editable = Captain; read-only = Super-admin.
 export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
@@ -99,13 +101,20 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                   return (
                     <td key={d}>
                       {editable ? (
-                        <select className="inp" value={v} onChange={(e) => setG({ ...g, [k]: e.target.value })}>
-                          <option value="">—</option>
-                          <option value="pagi">Pagi</option>
-                          <option value="siang">Siang</option>
-                        </select>
+                        <button
+                          type="button"
+                          title="Klik untuk mengganti: kosong → pagi → siang"
+                          onClick={() => setG({ ...g, [k]: SIKLUS[(SIKLUS.indexOf(v) + 1) % SIKLUS.length] })}
+                          className={`w-20 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                            v === 'pagi' ? 'border-warning/30 bg-warning-soft text-warning'
+                            : v === 'siang' ? 'border-primary/30 bg-primary-soft text-primary-soft-foreground'
+                            : 'border-dashed border-input text-muted-foreground/70 hover:border-primary hover:text-primary'
+                          }`}
+                        >
+                          {v === 'pagi' ? 'Pagi' : v === 'siang' ? 'Siang' : '—'}
+                        </button>
                       ) : (
-                        v && <span className="capitalize">{v}</span>
+                        v && <span className={`badge capitalize ${v === 'pagi' ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary-soft-foreground'}`}>{v}</span>
                       )}
                     </td>
                   )
@@ -145,13 +154,7 @@ export function JadwalSemua() {
   const ds = dsl.rows.find((d) => d.id === (id || dsl.rows[0]?.id))
   return (
     <div>
-      <select className="inp mb-3" value={ds?.id ?? ''} onChange={(e) => setId(e.target.value)}>
-        {dsl.rows.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.nama}
-          </option>
-        ))}
-      </select>
+      <Select className="mb-3 w-72 max-w-full" value={ds?.id ?? ''} onChange={setId} placeholder="Pilih DS" opsi={dsl.rows.map((d) => ({ value: d.id, label: d.nama }))} />
       {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
     </div>
   )

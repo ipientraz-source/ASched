@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
-import { useEffect, useState, type ReactNode } from 'react'
-import { AlertCircle, CheckCircle2, Inbox, Moon, Sun, X, type LucideIcon } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { AlertCircle, Check, CheckCircle2, ChevronDown, Inbox, Moon, Search, Sun, X, type LucideIcon } from 'lucide-react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
 
@@ -222,21 +223,156 @@ export function RiderPick({
   onChange: (id: string) => void
   placeholder?: string
 }) {
-  const [q, setQ] = useState('')
-  const f = riders.filter((r) => (r.nama + ' ' + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase())).slice(0, 50)
   return (
-    <span className="inline-flex gap-1">
-      <input className="inp w-28" placeholder="ketik nama…" value={q} onChange={(e) => setQ(e.target.value)} />
-      <select className="inp" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{placeholder ?? '— pilih —'}</option>
-        {f.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.nama}
-            {r.kode_mtr ? ` (${r.kode_mtr})` : ''}
-          </option>
-        ))}
-      </select>
-    </span>
+    <Select
+      cari
+      className="w-full min-w-52"
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder ?? '— pilih rider —'}
+      opsi={riders.map((r) => ({ value: r.id, label: r.nama + (r.kode_mtr ? ` (${r.kode_mtr})` : '') }))}
+    />
+  )
+}
+
+// Pilihan (dropdown) bertema: bisa dicari, bisa dipakai dengan keyboard (↑ ↓ Enter Esc),
+// dan daftarnya tidak terpotong di dalam tabel karena ditampilkan lewat portal.
+export type Opsi = { value: string; label: string }
+export function Select({ value, onChange, opsi, placeholder = 'Pilih…', className = '', disabled = false, cari }: {
+  value: string
+  onChange: (v: string) => void
+  opsi: Opsi[]
+  placeholder?: string
+  className?: string
+  disabled?: boolean
+  cari?: boolean // paksa tampilkan kolom cari; default: otomatis bila opsi > 7
+}) {
+  const [buka, setBuka] = useState(false)
+  const [q, setQ] = useState('')
+  const [aktif, setAktif] = useState(0)
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxH: number }>({ left: 0, width: 0, maxH: 0 })
+  const tombol = useRef<HTMLButtonElement>(null)
+  const kotak = useRef<HTMLDivElement>(null)
+  const kolomCari = useRef<HTMLInputElement>(null)
+  const bisaCari = cari ?? opsi.length > 7
+  const tampil = opsi.filter((o) => !q || o.label.toLowerCase().includes(q.toLowerCase()))
+  const terpilih = opsi.find((o) => o.value === value)
+
+  const bukaDaftar = () => {
+    const r = tombol.current!.getBoundingClientRect()
+    const bawah = window.innerHeight - r.bottom
+    const keAtas = bawah < 280 && r.top > bawah
+    const width = Math.max(r.width, 224)
+    setPos({
+      left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
+      width,
+      ...(keAtas ? { bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6 }),
+      maxH: Math.min(340, (keAtas ? r.top : bawah) - 16),
+    })
+    setQ('')
+    setAktif(Math.max(0, opsi.findIndex((o) => o.value === value)))
+    setBuka(true)
+  }
+  const tutup = () => {
+    setBuka(false)
+    tombol.current?.focus()
+  }
+  const pilih = (v: string) => {
+    onChange(v)
+    tutup()
+  }
+
+  useEffect(() => {
+    if (!buka) return
+    const luar = (e: Event) => {
+      if (!kotak.current?.contains(e.target as Node) && !tombol.current?.contains(e.target as Node)) setBuka(false)
+    }
+    const gulir = (e: Event) => {
+      if (!kotak.current?.contains(e.target as Node)) setBuka(false)
+    }
+    const ukuran = () => setBuka(false)
+    document.addEventListener('mousedown', luar)
+    window.addEventListener('scroll', gulir, true)
+    window.addEventListener('resize', ukuran)
+    setTimeout(() => (bisaCari ? kolomCari.current : kotak.current)?.focus(), 0)
+    return () => {
+      document.removeEventListener('mousedown', luar)
+      window.removeEventListener('scroll', gulir, true)
+      window.removeEventListener('resize', ukuran)
+    }
+  }, [buka, bisaCari])
+
+  useEffect(() => {
+    kotak.current?.querySelector('[data-aktif="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [aktif, buka])
+
+  const tekan = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAktif((a) => Math.min(a + 1, tampil.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setAktif((a) => Math.max(a - 1, 0)) }
+    else if (e.key === 'Enter') { e.preventDefault(); if (tampil[aktif]) pilih(tampil[aktif].value) }
+    else if (e.key === 'Escape') { e.preventDefault(); tutup() }
+    else if (e.key === 'Tab') setBuka(false)
+  }
+
+  return (
+    <>
+      <button
+        ref={tombol}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={buka}
+        onClick={() => (buka ? setBuka(false) : bukaDaftar())}
+        onKeyDown={(e) => { if (!buka && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); bukaDaftar() } }}
+        className={`inp inline-flex items-center justify-between gap-2 text-left ${buka ? '!border-primary ring-[length:var(--ring-width)] ring-ring/25' : ''} ${className}`}
+      >
+        <span className={`truncate ${terpilih ? '' : 'text-muted-foreground/70'}`}>{terpilih?.label ?? placeholder}</span>
+        <ChevronDown size={16} className={`shrink-0 text-muted-foreground transition-transform ${buka ? 'rotate-180' : ''}`} />
+      </button>
+      {buka &&
+        createPortal(
+          <div
+            ref={kotak}
+            tabIndex={-1}
+            onKeyDown={tekan}
+            style={{ position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxH }}
+            className="rise z-[60] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl outline-none"
+          >
+            {bisaCari && (
+              <div className="p-2 border-b border-border">
+                <div className="relative">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    ref={kolomCari}
+                    className="inp w-full !pl-8"
+                    placeholder="Ketik untuk mencari…"
+                    value={q}
+                    onChange={(e) => { setQ(e.target.value); setAktif(0) }}
+                  />
+                </div>
+              </div>
+            )}
+            <ul role="listbox" className="overflow-y-auto p-1">
+              {tampil.map((o, i) => (
+                <li
+                  key={o.value}
+                  role="option"
+                  aria-selected={o.value === value}
+                  data-aktif={i === aktif}
+                  onMouseEnter={() => setAktif(i)}
+                  onClick={() => pilih(o.value)}
+                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm ${i === aktif ? 'bg-primary-soft text-primary-soft-foreground' : ''} ${o.value === value ? 'font-semibold' : ''}`}
+                >
+                  <span className="flex-1 truncate">{o.label}</span>
+                  {o.value === value && <Check size={14} className="shrink-0 text-primary" />}
+                </li>
+              ))}
+              {!tampil.length && <li className="px-3 py-4 text-center text-sm text-muted-foreground">Tidak ada yang cocok</li>}
+            </ul>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 

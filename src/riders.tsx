@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { UserCheck, UserMinus, Users } from 'lucide-react'
-import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -35,13 +35,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
       <div className="flex flex-wrap gap-2 mb-3">
         <input className="inp" placeholder="cari nama / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         {sup && (
-          <select className="inp" value={fds} onChange={(e) => setFds(e.target.value)}>
-            <option value="">Semua DS</option>
-            <option value="-">Belum punya DS</option>
-            {dsl.rows.map((d) => (
-              <option key={d.id} value={d.id}>{d.nama}</option>
-            ))}
-          </select>
+          <Select className="w-56" value={fds} onChange={setFds} opsi={[{ value: '', label: 'Semua DS' }, { value: '-', label: 'Belum punya DS' }, ...dsl.rows.map((d) => ({ value: d.id, label: d.nama }))]} />
         )}
         {sup && (
           <button className="btn2 ml-auto" onClick={() => download('rider.csv', toCsv(shown.map((r) => ({ kode_mtr: r.kode_mtr, nama: r.nama, no_hp: r.no_hp, ds: dsNama(r.ds_id) === '—' ? '' : dsNama(r.ds_id), status: r.status, peran: r.peran }))))}>
@@ -66,12 +60,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
                 <td>{r.kode_mtr}</td><td>{r.nama}</td><td>{r.no_hp}</td>
                 <td>
                   {sup ? (
-                    <select className="inp" value={r.ds_id ?? ''} onChange={(e) => setDs(r, e.target.value)}>
-                      <option value="">— belum punya DS —</option>
-                      {dsl.rows.map((d) => (
-                        <option key={d.id} value={d.id}>{d.nama}</option>
-                      ))}
-                    </select>
+                    <Select className="w-52" value={r.ds_id ?? ''} onChange={(v) => setDs(r, v)} opsi={[{ value: '', label: '— belum punya DS —' }, ...dsl.rows.map((d) => ({ value: d.id, label: d.nama }))]} />
                   ) : (
                     dsNama(r.ds_id)
                   )}
@@ -110,12 +99,7 @@ function TambahRider({ dsl, done }: { dsl: Ds[]; done: () => void }) {
           <input className="inp w-full" placeholder="Contoh: 08123456789" value={f.no_hp} onChange={(e) => setF({ ...f, no_hp: e.target.value })} />
         </Field>
         <Field label="DS" hint="DS tempat rider bekerja. Kalau belum jelas, biarkan dulu — Captain bisa menariknya nanti.">
-          <select className="inp w-full" value={f.ds_id} onChange={(e) => setF({ ...f, ds_id: e.target.value })}>
-            <option value="">— belum punya DS —</option>
-            {dsl.map((d) => (
-              <option key={d.id} value={d.id}>{d.nama}</option>
-            ))}
-          </select>
+          <Select className="w-full" value={f.ds_id} onChange={(v) => setF({ ...f, ds_id: v })} opsi={[{ value: '', label: '— belum punya DS —' }, ...dsl.map((d) => ({ value: d.id, label: d.nama }))]} />
         </Field>
       </div>
       <div className="mt-3">
