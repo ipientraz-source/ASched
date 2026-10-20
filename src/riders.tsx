@@ -124,42 +124,90 @@ function TambahRider({ dsl, done }: { dsl: Ds[]; done: () => void }) {
   )
 }
 
-// Import CSV (Super-admin): gabung pakai Kode MTR; DS harus sudah ada; yang tak ada di file dibiarkan
+// Import CSV (Super-admin): gabung pakai Kode MTR; DS harus sudah ada; yang tak ada di file dibiarkan.
+// Alur dua langkah ala Pulse: upload → preview → konfirmasi.
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+const ALIAS: Record<string, string[]> = {
+  kode_mtr: ['kodemtr', 'employeeid', 'employee', 'id', 'mtr', 'kodemitra', 'mtrcode', 'idkaryawan', 'kodekaryawan'],
+  nama: ['nama', 'fullname', 'name', 'namalengkap'],
+  no_hp: ['nohp', 'phone', 'telepon', 'telp', 'hp', 'notelp', 'nowa', 'whatsapp', 'wa', 'nomorwhatsapp'],
+  ds: ['ds', 'depot', 'store', 'namads'],
+  status: ['status'],
+}
+// Alias status ala Pulse → aktif / nonaktif. Nilai lain dibiarkan apa adanya agar ditolak server dengan pesan jelas.
+const STATUS: Record<string, string> = {
+  aktif: 'aktif', active: 'aktif', ready: 'aktif', readytowork: 'aktif', available: 'aktif', hire: 'aktif', probation: 'aktif', contract: 'aktif',
+  nonaktif: 'nonaktif', inactive: 'nonaktif', nonactive: 'nonaktif', resign: 'nonaktif', resigned: 'nonaktif', withdrawn: 'nonaktif', blacklisted: 'nonaktif', blacklist: 'nonaktif', suspended: 'nonaktif',
+}
+type Baris = { baris: number; kode_mtr: string; nama: string; no_hp: string; ds: string; status: string }
+
 function ImportCsv({ done }: { done: () => void }) {
+  const [rows, setRows] = useState<Baris[]>([])
+  const [file, setFile] = useState('')
   const [hasil, setHasil] = useState<Hasil | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function onFile(f: File) {
+    setHasil(null)
     const [h, ...body] = parseCsv((await f.text()).replace(/^﻿/, ''))
-    const idx = (n: string) => h.findIndex((x) => x.trim().toLowerCase() === n)
-    const cols = { kode_mtr: idx('kode_mtr'), nama: idx('nama'), no_hp: idx('no_hp'), ds: idx('ds'), status: idx('status') }
-    if (cols.kode_mtr < 0 || cols.nama < 0) return alert('Header wajib: kode_mtr, nama (opsional: no_hp, ds, status)')
-    const rows = body
-      .map((c, i) => ({
-        baris: i + 2,
-        ...Object.fromEntries(Object.entries(cols).map(([k, ci]) => [k, ci < 0 ? '' : (c[ci] ?? '').trim()])),
-      }))
-      .filter((r) => Object.values(r).some((v) => typeof v === 'string' && v !== ''))
+    if (!h || !body.length) return alert('CSV kosong atau hanya berisi header')
+    const col: Record<string, number> = {}
+    h.forEach((x, i) => {
+      for (const [field, al] of Object.entries(ALIAS)) if (!(field in col) && (norm(x) === norm(field) || al.includes(norm(x)))) col[field] = i
+    })
+    if (!('kode_mtr' in col) || !('nama' in col)) return alert('Kolom wajib tidak ditemukan: kode_mtr (atau employee_id / kode mitra) dan nama (atau full_name)')
+    const get = (c: string[], k: string) => (k in col ? (c[col[k]] ?? '').trim() : '')
+    setRows(
+      body
+        .map((c, i) => {
+          const st = get(c, 'status')
+          return { baris: i + 2, kode_mtr: get(c, 'kode_mtr'), nama: get(c, 'nama'), no_hp: get(c, 'no_hp'), ds: get(c, 'ds'), status: STATUS[norm(st)] ?? st }
+        })
+        .filter((r) => r.kode_mtr || r.nama || r.no_hp || r.ds),
+    )
+    setFile(f.name)
+  }
+
+  async function run() {
     setBusy(true)
     const { data, error } = await sb.rpc('import_riders', { p_rows: rows })
     setBusy(false)
     if (error) return alert(error.message)
     setHasil(data as Hasil)
+    setRows([])
+    setFile('')
     done()
   }
 
   return (
     <div className="card">
       <b className="block mb-1">Import CSV rider</b>
-      <p className="text-xs text-zinc-500 mb-2">
-        Kolom: kode_mtr, nama, no_hp, ds, status. Nama DS harus persis sama dengan DS yang sudah dibuat. Rider yang sudah ada di-update, yang baru ditambah, yang tidak ada di file dibiarkan.{' '}
+      <p className="text-xs text-zinc-500 mb-3">
+        Wajib: kode MTR dan nama. Opsional: no_hp, ds, status (aktif / nonaktif). Nama kolom fleksibel (mis. <i>employee_id</i>, <i>full_name</i>, <i>kode mitra</i> juga dikenali). Nama DS harus persis sama dengan DS yang sudah dibuat. Rider yang sudah ada di-update, yang baru ditambah, yang tidak ada di file dibiarkan.{' '}
         <button className="underline" onClick={() => download('template-rider.csv', 'kode_mtr,nama,no_hp,ds,status\r\nMTR001,Budi,0812xxxx,Galaxy,aktif')}>
           Unduh template
         </button>
       </p>
-      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-zinc-500 file:mr-3 file:rounded-md file:border file:border-zinc-300 file:bg-white file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:border-ink" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-zinc-500 file:mr-3 file:rounded-md file:border file:border-zinc-300 file:bg-white file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:border-ink" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
+      {rows.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm mb-2"><b>{file}</b> — {rows.length} baris siap diimpor. Pratinjau 5 baris pertama:</p>
+          <div className="overflow-x-auto mb-3">
+            <table className="tbl">
+              <thead><tr><th>Baris</th><th>Kode MTR</th><th>Nama</th><th>No HP</th><th>DS</th><th>Status</th></tr></thead>
+              <tbody>
+                {rows.slice(0, 5).map((r) => (
+                  <tr key={r.baris}><td>{r.baris}</td><td>{r.kode_mtr}</td><td>{r.nama}</td><td>{r.no_hp}</td><td>{r.ds}</td><td>{r.status}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button className="btn" disabled={busy} onClick={run}>{busy ? 'Mengimpor…' : `Import ${rows.length} rider`}</button>
+          <button className="btn2 ml-2" disabled={busy} onClick={() => { setRows([]); setFile('') }}>Batal</button>
+        </div>
+      )}
       {hasil && (
-        <div className="mt-2 text-sm">
+        <div className="mt-4 text-sm">
           <p>
             Ditambah <b>{hasil.inserted}</b>, di-update <b>{hasil.updated}</b>, error <b className={hasil.errors.length ? 'text-red-600' : ''}>{hasil.errors.length}</b>
           </p>
