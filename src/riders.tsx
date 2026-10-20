@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { UserCheck, UserMinus, Users } from 'lucide-react'
+import { cocokDs, namaDsBaru, ringkasPerRider, type Baris } from './impor'
 import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, usePage, Pagination, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
@@ -80,7 +81,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
         </div>
         <Pagination {...pg} />
       </div>
-      {sup ? <ImportCsv done={rs.reload} /> : ds && <Tarik ds={ds} done={rs.reload} />}
+      {sup ? <ImportCsv done={() => { rs.reload(); dsl.reload() }} dsl={dsl.rows} /> : ds && <Tarik ds={ds} done={rs.reload} />}
       {sup && <TambahRider dsl={dsl.rows} done={rs.reload} />}
     </div>
   )
@@ -131,7 +132,7 @@ const ALIAS: Record<string, string[]> = {
   kode_mtr: ['kodemtr', 'employeeid', 'employee', 'id', 'mtr', 'kodemitra', 'mtrcode', 'idkaryawan', 'kodekaryawan'],
   nama: ['nama', 'fullname', 'name', 'namalengkap'],
   no_hp: ['nohp', 'phone', 'telepon', 'telp', 'hp', 'notelp', 'nowa', 'whatsapp', 'wa', 'nomorwhatsapp'],
-  ds: ['ds', 'depot', 'store', 'namads'],
+  ds: ['ds', 'depot', 'store', 'namads', 'pitstopname', 'pitstop'],
   status: ['status'],
 }
 // Alias status ala Pulse → aktif / nonaktif. Nilai lain dibiarkan apa adanya agar ditolak server dengan pesan jelas.
@@ -139,10 +140,21 @@ const STATUS: Record<string, string> = {
   aktif: 'aktif', active: 'aktif', ready: 'aktif', readytowork: 'aktif', available: 'aktif', hire: 'aktif', probation: 'aktif', contract: 'aktif',
   nonaktif: 'nonaktif', inactive: 'nonaktif', nonactive: 'nonaktif', resign: 'nonaktif', resigned: 'nonaktif', withdrawn: 'nonaktif', blacklisted: 'nonaktif', blacklist: 'nonaktif', suspended: 'nonaktif',
 }
-type Baris = { baris: number; kode_mtr: string; nama: string; no_hp: string; ds: string; status: string }
-
-function ImportCsv({ done }: { done: () => void }) {
+function ImportCsv({ done, dsl }: { done: () => void; dsl: Ds[] }) {
   const [rows, setRows] = useState<Baris[]>([])
+  const [absensi, setAbsensi] = useState(false) // file export absensi (punya kolom Pitstop Name)
+  const [jmlBaris, setJmlBaris] = useState(0)
+  const [buatBaru, setBuatBaru] = useState(true)
+  // Khusus file absensi: lokasi di file → DS yang sudah ada (atau DS baru yang diusulkan)
+  const peta = absensi
+    ? [...rows.reduce((m, r) => (r.ds ? m.set(r.ds, (m.get(r.ds) ?? 0) + 1) : m), new Map<string, number>())]
+        .map(([lokasi, jumlah]) => {
+          const ke = cocokDs(lokasi, dsl.map((d) => d.nama))
+          return { lokasi, jumlah, ke, baru: ke ? '' : namaDsBaru(lokasi) }
+        })
+        .sort((a, b) => b.jumlah - a.jumlah)
+    : []
+  const pgPeta = usePage(peta, [rows])
   const [file, setFile] = useState('')
   const [hasil, setHasil] = useState<Hasil | null>(null)
   const [busy, setBusy] = useState(false)
@@ -157,20 +169,37 @@ function ImportCsv({ done }: { done: () => void }) {
     })
     if (!('kode_mtr' in col) || !('nama' in col)) return toast('Kolom wajib tidak ditemukan: kode_mtr (atau employee_id / kode mitra) dan nama (atau full_name)')
     const get = (c: string[], k: string) => (k in col ? (c[col[k]] ?? '').trim() : '')
-    setRows(
-      body
-        .map((c, i) => {
-          const st = get(c, 'status')
-          return { baris: i + 2, kode_mtr: get(c, 'kode_mtr'), nama: get(c, 'nama'), no_hp: get(c, 'no_hp'), ds: get(c, 'ds'), status: STATUS[norm(st)] ?? st }
-        })
-        .filter((r) => r.kode_mtr || r.nama || r.no_hp || r.ds),
-    )
+    const semua = body
+      .map((c, i) => {
+        const st = get(c, 'status')
+        return { baris: i + 2, kode_mtr: get(c, 'kode_mtr'), nama: get(c, 'nama'), no_hp: get(c, 'no_hp'), ds: get(c, 'ds'), status: STATUS[norm(st)] ?? st }
+      })
+      .filter((r) => r.kode_mtr || r.nama || r.no_hp || r.ds)
+    // File absensi punya banyak baris per rider: jadikan satu baris per rider. CSV rider biasa tidak diubah.
+    const dariAbsensi = h.some((x) => norm(x) === 'pitstopname')
+    setAbsensi(dariAbsensi)
+    setJmlBaris(semua.length)
+    setRows(dariAbsensi ? ringkasPerRider(semua) : semua)
     setFile(f.name)
   }
 
   async function run() {
     setBusy(true)
-    const { data, error } = await sb.rpc('import_riders', { p_rows: rows })
+    let kirim: Baris[] = rows
+    if (absensi) {
+      // DS baru dibuat hanya untuk file absensi (nama lokasi berasal dari sistem). CSV rider biasa tetap ketat: DS salah ketik ditolak.
+      const tujuan = new Map(peta.map((p) => [p.lokasi, p.ke ?? (buatBaru ? p.baru : '')]))
+      const baruDs = [...new Set(peta.filter((p) => !p.ke && buatBaru).map((p) => p.baru))]
+      if (baruDs.length) {
+        const { error: e1 } = await sb.from('ds').upsert(baruDs.map((nama) => ({ nama })), { onConflict: 'nama', ignoreDuplicates: true })
+        if (e1) {
+          setBusy(false)
+          return toast(e1.message)
+        }
+      }
+      kirim = rows.map((r) => ({ ...r, ds: r.ds ? tujuan.get(r.ds) ?? '' : '' }))
+    }
+    const { data, error } = await sb.rpc('import_riders', { p_rows: kirim })
     setBusy(false)
     if (error) return toast(error.message)
     setHasil(data as Hasil)
@@ -183,7 +212,7 @@ function ImportCsv({ done }: { done: () => void }) {
     <div className="card">
       <b className="block mb-1">Import CSV rider</b>
       <p className="text-xs text-muted-foreground mb-3">
-        Wajib: kode MTR dan nama. Opsional: no_hp, ds, status (aktif / nonaktif). Nama kolom fleksibel (mis. <i>employee_id</i>, <i>full_name</i>, <i>kode mitra</i> juga dikenali). Nama DS harus persis sama dengan DS yang sudah dibuat. Rider yang sudah ada di-update, yang baru ditambah, yang tidak ada di file dibiarkan.{' '}
+        Wajib: kode MTR dan nama. Opsional: no_hp, ds, status (aktif / nonaktif). Nama kolom fleksibel (mis. <i>employee_id</i>, <i>full_name</i>, <i>kode mitra</i> juga dikenali). Nama DS harus persis sama dengan DS yang sudah dibuat. Rider yang sudah ada di-update, yang baru ditambah, yang tidak ada di file dibiarkan. File absensi dari sistem (ada kolom Kode Mitra dan Pitstop Name) juga bisa langsung diunggah: rider diambil otomatis tanpa NIK, selfie, dan GPS.{' '}
         <button className="underline" onClick={() => download('template-rider.csv', 'kode_mtr,nama,no_hp,ds,status\r\nMTR001,Budi,0812xxxx,Galaxy,aktif')}>
           Unduh template
         </button>
@@ -191,7 +220,39 @@ function ImportCsv({ done }: { done: () => void }) {
       <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:border-foreground/50" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {rows.length > 0 && (
         <div className="mt-4">
-          <p className="text-sm mb-2"><b>{file}</b> — {rows.length} baris siap diimpor. Ini 5 baris pertama:</p>
+          {absensi && (
+            <div className="mb-4 rounded-xl border border-border p-3 text-sm">
+              <p className="mb-2">
+                <b>File absensi terdeteksi:</b> {jmlBaris} baris absensi menjadi <b>{rows.length}</b> rider unik. NIK, selfie, dan GPS tidak dibaca. Rider yang muncul di beberapa lokasi dimasukkan ke lokasi yang paling sering.
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="tbl">
+                  <thead><tr><th>Lokasi di file</th><th>Rider</th><th>Masuk ke DS</th></tr></thead>
+                  <tbody>
+                    {pgPeta.rows.map((p) => (
+                      <tr key={p.lokasi}>
+                        <td>{p.lokasi}</td>
+                        <td>{p.jumlah}</td>
+                        <td>
+                          {p.ke ? <span className="badge bg-primary-soft text-primary-soft-foreground">{p.ke}</span>
+                            : buatBaru ? <span className="badge bg-warning-soft text-warning">DS baru: {p.baru}</span>
+                            : <span className="badge bg-muted text-muted-foreground">Belum punya DS</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Pagination {...pgPeta} />
+              </div>
+              {peta.some((p) => !p.ke) && (
+                <label className="mt-3 flex items-center gap-2">
+                  <input type="checkbox" checked={buatBaru} onChange={(e) => setBuatBaru(e.target.checked)} />
+                  Buat DS baru untuk lokasi yang belum ada (kuotanya diisi nanti di Kelola DS)
+                </label>
+              )}
+            </div>
+          )}
+          <p className="text-sm mb-2"><b>{file}</b> — {rows.length} rider siap diimpor. Ini 5 baris pertama:</p>
           <div className="overflow-x-auto mb-3">
             <table className="tbl">
               <thead><tr><th>Baris</th><th>Kode MTR</th><th>Nama</th><th>No HP</th><th>DS</th><th>Status</th></tr></thead>
