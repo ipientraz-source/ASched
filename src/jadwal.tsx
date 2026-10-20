@@ -84,13 +84,13 @@ function Pil({ v, klik, title, ringkas }: { v: string; klik?: () => void; title?
     ? v === 'pagi' ? 'P' : v === 'siang' ? 'S' : v === 'off' ? <Lock size={12} /> : '–'
     : v === 'pagi' ? <><Sunrise size={13} />Pagi</>
     : v === 'siang' ? <><Sun size={13} />Siang</>
-    : v === 'off' ? <><Lock size={12} />Cuti</>
+    : v === 'off' ? <><Lock size={12} />Off</>
     : <span title="Kosong = libur biasa">–</span>
   const kelas = `inline-flex items-center justify-center rounded-lg border font-bold transition-all ${ringkas ? 'size-7 text-[11px]' : 'w-[4.75rem] gap-1 px-2 py-1.5 text-xs'} ${gaya}`
   return klik ? (
     <button type="button" title={title} onClick={klik} className={`${kelas} hover:scale-105 hover:border-primary ${v ? '' : 'hover:text-primary'}`}>{isi}</button>
   ) : (
-    <span className={kelas} title={v === 'off' ? 'Cuti terkunci (cuti/izin yang disepakati): tidak diubah saat susun otomatis' : undefined}>{isi}</span>
+    <span className={kelas} title={v === 'off' ? 'Off terkunci (cuti/izin yang disepakati): tidak diubah saat susun otomatis' : undefined}>{isi}</span>
   )
 }
 

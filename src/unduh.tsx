@@ -25,9 +25,9 @@ function Sel({ v, padat }: { v: string; padat: boolean }) {
   if (!v) return <span className="text-muted-foreground/40">·</span>
   if (v === 'off')
     return padat ? (
-      <span className="inline-flex size-6 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground">C</span>
+      <span className="inline-flex size-6 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground">O</span>
     ) : (
-      <span className="inline-block w-[4.5rem] rounded-lg border border-border bg-muted px-2 py-1.5 text-xs font-semibold text-muted-foreground">Cuti</span>
+      <span className="inline-block w-[4.5rem] rounded-lg border border-border bg-muted px-2 py-1.5 text-xs font-semibold text-muted-foreground">Off</span>
     )
   const pagi = v === 'pagi'
   if (padat)
@@ -112,7 +112,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
           <div className="mb-3 mt-3 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><Sel v="pagi" padat={false} /> shift pagi</span>
             <span className="flex items-center gap-1.5"><Sel v="siang" padat={false} /> shift siang</span>
-            <span className="flex items-center gap-1.5"><Sel v="off" padat={false} /> cuti terkunci</span>
+            <span className="flex items-center gap-1.5"><Sel v="off" padat={false} /> off terkunci (cuti/izin)</span>
             <span className="flex items-center gap-1.5"><Sel v="" padat={false} /> kosong = libur biasa</span>
           </div>
 
