@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Copy, Sparkles } from 'lucide-react'
 import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, type Ds, type Me, type Rider } from './lib'
+import { buatDraf } from './otomatis'
 
 // Grid jadwal 1 DS × 1 minggu (Senin–Minggu). editable = Captain; read-only = Super-admin.
 export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
@@ -18,6 +20,31 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
 
   const cnt = (d: string, s: string) => riders.rows.filter((r) => g[`${r.id}|${d}`] === s).length
   const shown = riders.rows.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
+
+  const adaIsi = days.some((d) => riders.rows.some((r) => g[`${r.id}|${d}`]))
+
+  // Draf otomatis: dibagi sesuai kuota DS secara adil. Belum tersimpan sampai Captain klik "Simpan jadwal".
+  const susunOtomatis = () => {
+    if (ds.kuota_pagi + ds.kuota_siang === 0) return toast('Kuota DS masih 0. Minta Super-admin mengisi kuota pagi dan siang di Kelola DS & Captain.')
+    if (!riders.rows.length) return toast('Belum ada rider aktif di DS ini.')
+    if (adaIsi && !confirm('Jadwal minggu ini sudah ada isinya. Ganti dengan draf otomatis?')) return
+    const { grid, kurang } = buatDraf(riders.rows.map((r) => r.id), days, ds.kuota_pagi, ds.kuota_siang)
+    setG(grid)
+    toast.ok(`Draf jadwal dibuat (${Object.keys(grid).length} shift). Periksa dulu, lalu klik Simpan jadwal.`)
+    if (kurang.length) toast(`Rider kurang untuk memenuhi kuota di ${kurang.length} hari (mulai ${hari(kurang[0].tanggal)}). Tambah rider atau kurangi kuota.`)
+  }
+
+  const salinMingguLalu = async () => {
+    const { data, error } = await sb.from('jadwal').select('rider_id,tanggal,shift').eq('ds_id', ds.id).gte('tanggal', addDays(start, -7)).lte('tanggal', addDays(start, -1))
+    if (error) return toast(error.message)
+    const aktif = new Set(riders.rows.map((r) => r.id)) // rider yang sudah pindah/nonaktif tidak ikut disalin
+    const baru: Record<string, string> = {}
+    for (const r of data ?? []) if (aktif.has(r.rider_id)) baru[`${r.rider_id}|${addDays(r.tanggal, 7)}`] = r.shift
+    if (!Object.keys(baru).length) return toast('Minggu lalu belum ada jadwal untuk disalin.')
+    if (adaIsi && !confirm('Jadwal minggu ini sudah ada isinya. Ganti dengan salinan minggu lalu?')) return
+    setG(baru)
+    toast.ok('Jadwal minggu lalu disalin. Periksa dulu, lalu klik Simpan jadwal.')
+  }
 
   const save = async () => {
     const rows = Object.entries(g)
@@ -42,9 +69,11 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         <button className="btn2" onClick={() => setStart(addDays(start, 7))}>→</button>
         <input className="inp" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         {editable && (
-          <button className="btn ml-auto" onClick={save}>
-            Simpan jadwal
-          </button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button className="btn2" onClick={salinMingguLalu}><Copy size={14} />Salin minggu lalu</button>
+            <button className="btn2" onClick={susunOtomatis}><Sparkles size={14} />Susun otomatis</button>
+            <button className="btn" onClick={save}>Simpan jadwal</button>
+          </div>
         )}
       </div>
       <Err msg={riders.err || j.err} />
@@ -100,7 +129,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
           </tbody>
         </table>
       </div>
-      {editable && <p className="text-xs text-muted-foreground mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan.</p>}
+      {editable && <p className="text-xs text-muted-foreground mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan. "Susun otomatis" membagi shift sesuai kuota secara adil (maksimal 6 hari kerja per rider, jadi ada minimal 1 hari libur). Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal.</p>}
     </div>
   )
 }
