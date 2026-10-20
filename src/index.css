@@ -1,11 +1,33 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-display: 'Sora', 'Manrope', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-brand: #7c3aed;
+  --color-brand-dark: #5b21b6;
+  --color-brand-soft: #f3effe;
+  --color-ink: #111113;
+}
+
+body { @apply bg-zinc-50 text-ink font-sans antialiased; }
+h1, h2, h3 { font-family: var(--font-display); }
+
 @layer components {
-  .inp { @apply border border-slate-300 rounded px-2 py-1 text-sm bg-white; }
-  .btn { @apply bg-slate-800 text-white rounded px-3 py-1 text-sm hover:bg-slate-700 disabled:opacity-40; }
-  .btn2 { @apply border border-slate-300 rounded px-3 py-1 text-sm bg-white hover:bg-slate-100 disabled:opacity-40; }
+  .inp { @apply border border-zinc-300 rounded-md px-2.5 py-1.5 text-sm bg-white placeholder:text-zinc-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20; }
+  .btn { @apply bg-brand text-white rounded-md px-3.5 py-1.5 text-sm font-semibold hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
+  .btn2 { @apply border border-zinc-300 rounded-md px-3.5 py-1.5 text-sm font-medium bg-white hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
+  .btn-lg { @apply min-h-11 px-5 text-base; }
+  .card { @apply bg-white border border-zinc-200 rounded-xl p-4 mb-4 shadow-sm; }
+  .stat { @apply bg-white border border-zinc-200 rounded-xl p-4 shadow-sm; }
+  .stat b { @apply block font-mono text-2xl font-bold text-ink; }
+  .stat span { @apply text-xs text-zinc-500; }
+  .lbl { @apply block font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1; }
   .tbl { @apply w-full text-sm border-collapse bg-white; }
-  .tbl th { @apply text-left bg-slate-100 px-2 py-1 font-medium whitespace-nowrap; }
-  .tbl td { @apply border-t border-slate-200 px-2 py-1; }
-  .card { @apply bg-white border border-slate-200 rounded p-3 mb-4; }
+  .tbl th { @apply text-left px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500 bg-zinc-50 border-b border-zinc-200 whitespace-nowrap; }
+  .tbl td { @apply px-3 py-2 border-b border-zinc-100; }
+  .tbl tbody tr:hover { @apply bg-brand-soft/50; }
+  .badge { @apply inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .tab { @apply px-3.5 py-1.5 text-sm font-semibold rounded-md text-zinc-600 hover:bg-zinc-100 whitespace-nowrap; }
+  .tab-on { @apply bg-brand text-white hover:bg-brand; }
 }

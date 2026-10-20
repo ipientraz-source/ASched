@@ -10,13 +10,13 @@ const ALASAN: [string, string][] = [
   ['sakit', 'Sakit'],
   ['tukar', 'Tukar terencana'],
 ]
-const WARNA: Record<string, string> = {
-  hadir: 'bg-green-100 text-green-800',
-  alpha: 'bg-red-100 text-red-800',
-  izin: 'bg-amber-100 text-amber-800',
-  sakit: 'bg-amber-100 text-amber-800',
-  tukar: 'bg-blue-100 text-blue-800',
-  pengganti: 'bg-purple-100 text-purple-800',
+export const WARNA: Record<string, string> = {
+  hadir: 'bg-zinc-900 text-white',
+  alpha: 'bg-red-100 text-red-700',
+  izin: 'bg-zinc-200 text-zinc-700',
+  sakit: 'bg-zinc-200 text-zinc-700',
+  tukar: 'bg-brand-soft text-brand-dark',
+  pengganti: 'bg-brand text-white',
 }
 
 export function Daily({ ds }: { me: Me; ds: Ds | null }) {
@@ -62,8 +62,11 @@ function DailyInner({ ds }: { ds: Ds }) {
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <input type="date" className="inp" value={tgl} max={today()} onChange={(e) => e.target.value && setTgl(e.target.value)} />
         <b>{hari(tgl)}</b>
-        <span className="text-sm text-slate-600">
-          Terisi {terisi}/{terjadwal.length} terjadwal
+        <span className="flex items-center gap-2 text-sm text-zinc-600">
+          <span className="w-28 h-2 rounded-full bg-zinc-200 overflow-hidden">
+            <span className="block h-full bg-brand" style={{ width: terjadwal.length ? `${(100 * terisi) / terjadwal.length}%` : '0%' }} />
+          </span>
+          <span className="font-mono">{terisi}/{terjadwal.length}</span> terisi
         </span>
         <input className="inp ml-auto" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
@@ -83,7 +86,7 @@ function DailyInner({ ds }: { ds: Ds }) {
             hapus={hapus}
           />
         ))}
-        {!shown.length && <p className="text-slate-500">Tidak ada rider terjadwal pada tanggal ini.</p>}
+        {!shown.length && <p className="text-zinc-500">Tidak ada rider terjadwal pada tanggal ini.</p>}
       </div>
       <TambahPengganti
         kandidat={riders.rows.filter((r) => !listed.some((l) => l.id === r.id))}
@@ -121,21 +124,21 @@ function Baris({
     <div className="card !mb-0">
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-40">
-          <b>{r.nama}</b> <span className="text-slate-400 text-xs">{r.kode_mtr}</span>
-          <div className="text-xs text-slate-500 capitalize">{shift ?? 'tidak dijadwalkan'}</div>
+          <b>{r.nama}</b> <span className="text-zinc-400 text-xs">{r.kode_mtr}</span>
+          <div className="text-xs text-zinc-500 capitalize">{shift ?? 'tidak dijadwalkan'}</div>
         </div>
         {act && (
-          <span className={`text-xs px-2 py-0.5 rounded ${WARNA[act.status]}`}>
+          <span className={`badge ${WARNA[act.status]}`}>
             {act.status}
             {act.status === 'pengganti' && act.backup_untuk_id ? ` untuk ${nama(act.backup_untuk_id)}` : ''}
           </span>
         )}
-        {act?.penjelasan && <span className="text-xs text-slate-500">“{act.penjelasan}”</span>}
+        {act?.penjelasan && <span className="text-xs text-zinc-500">“{act.penjelasan}”</span>}
         <div className="ml-auto flex gap-2">
-          <button className="btn" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
+          <button className="btn btn-lg" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
             Hadir
           </button>
-          <button className="btn2" disabled={locked} onClick={() => setBuka(!buka)}>
+          <button className="btn2 btn-lg" disabled={locked} onClick={() => setBuka(!buka)}>
             Tidak
           </button>
           {act && (

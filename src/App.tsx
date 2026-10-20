@@ -43,6 +43,10 @@ export default function App() {
   return <Login onKode={(k) => { store.set('kode', k); setKode(k) }} />
 }
 
+const Logo = ({ small }: { small?: boolean }) => (
+  <div className={`${small ? 'size-9 text-base' : 'size-14 text-2xl'} rounded-xl bg-brand text-white font-display font-bold flex items-center justify-center`}>D</div>
+)
+
 // Satu halaman login, toggle Admin (email+password) / Rider (Kode MTR)
 function Login({ onKode }: { onKode: (k: string) => void }) {
   const [tab, setTab] = useState<'admin' | 'rider'>('admin')
@@ -67,20 +71,32 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="max-w-xs mx-auto mt-24 card">
-      <h1 className="text-lg font-semibold mb-3 text-center">Dash Scheduler</h1>
-      <div className="grid grid-cols-2 mb-3 text-sm">
-        {(['admin', 'rider'] as const).map((t) => (
-          <button type="button" key={t} onClick={() => { setTab(t); setErr('') }} className={`py-1 border ${tab === t ? 'bg-slate-800 text-white' : 'bg-white'}`}>
-            {t === 'admin' ? 'Admin' : 'Rider'}
-          </button>
-        ))}
-      </div>
-      <input className="inp w-full mb-2" placeholder={tab === 'admin' ? 'Email' : 'Kode MTR'} value={a} onChange={(e) => setA(e.target.value)} autoFocus />
-      {tab === 'admin' && <input className="inp w-full mb-2" type="password" placeholder="Password" value={b} onChange={(e) => setB(e.target.value)} />}
-      <Err msg={err} />
-      <button className="btn w-full" disabled={busy || !a.trim() || (tab === 'admin' && !b)}>Masuk</button>
-    </form>
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <form onSubmit={submit} className="w-full max-w-sm card !p-6 !mb-0">
+        <div className="flex flex-col items-center mb-5">
+          <Logo />
+          <h1 className="text-xl font-bold mt-3">Dash Scheduler</h1>
+          <p className="text-sm text-zinc-500">Jadwal & monitoring rider</p>
+        </div>
+        <div className="grid grid-cols-2 gap-1 p-1 mb-4 rounded-lg bg-zinc-100">
+          {(['admin', 'rider'] as const).map((t) => (
+            <button type="button" key={t} onClick={() => { setTab(t); setErr('') }} className={`tab text-center ${tab === t ? 'tab-on' : ''}`}>
+              {t === 'admin' ? 'Admin' : 'Rider'}
+            </button>
+          ))}
+        </div>
+        <label className="lbl">{tab === 'admin' ? 'Email' : 'Kode MTR'}</label>
+        <input className="inp w-full mb-3" value={a} onChange={(e) => setA(e.target.value)} autoFocus />
+        {tab === 'admin' && (
+          <>
+            <label className="lbl">Password</label>
+            <input className="inp w-full mb-3" type="password" value={b} onChange={(e) => setB(e.target.value)} />
+          </>
+        )}
+        <Err msg={err} />
+        <button className="btn btn-lg w-full" disabled={busy || !a.trim() || (tab === 'admin' && !b)}>Masuk</button>
+      </form>
+    </div>
   )
 }
 
@@ -114,15 +130,21 @@ function AdminApp({ email }: { email: string }) {
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      <header className="flex items-center gap-3 mb-3">
-        <h1 className="font-semibold">Dash Scheduler</h1>
-        <span className="text-sm text-slate-600">{me.nama} · {me.peran.replace('_', '-')}{ds ? ` · ${ds.nama}` : ''}</span>
-        <button className="btn2 ml-auto" onClick={() => sb.auth.signOut()}>Keluar</button>
+      <header className="flex items-center gap-3 mb-4">
+        <Logo small />
+        <h1 className="font-bold text-lg">Dash Scheduler</h1>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="text-right leading-tight">
+            <div className="text-sm font-semibold">{me.nama}</div>
+            <div className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">{me.peran.replace('_', '-')}{ds ? ` · ${ds.nama}` : ''}</div>
+          </div>
+          <button className="btn2" onClick={() => sb.auth.signOut()}>Keluar</button>
+        </div>
       </header>
       {me.peran === 'captain' && <Notif me={me} />}
-      <nav className="flex flex-wrap gap-1 mb-4 border-b border-slate-200">
+      <nav className="flex gap-1 mb-5 p-1 rounded-lg bg-white border border-zinc-200 overflow-x-auto">
         {tabs.map(([nama], i) => (
-          <button key={nama} onClick={() => setTab(i)} className={`px-3 py-1.5 text-sm -mb-px border-b-2 ${i === tab ? 'border-slate-800 font-medium' : 'border-transparent text-slate-500'}`}>
+          <button key={nama} onClick={() => setTab(i)} className={`tab ${i === tab ? 'tab-on' : ''}`}>
             {nama}
           </button>
         ))}

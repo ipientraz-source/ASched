@@ -69,16 +69,17 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
 
   return (
     <div className="card">
-      <div className="flex flex-wrap gap-2 items-center mb-2">
-        <input className="inp" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
-        <label className="text-sm">Pagi <input type="number" min={0} className="inp w-16" value={f.kuota_pagi} onChange={(e) => setF({ ...f, kuota_pagi: +e.target.value })} /></label>
-        <label className="text-sm">Siang <input type="number" min={0} className="inp w-16" value={f.kuota_siang} onChange={(e) => setF({ ...f, kuota_siang: +e.target.value })} /></label>
-        <input className="inp" placeholder="Group ID WhatsApp" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} />
+      <div className="flex flex-wrap gap-3 items-end mb-3">
+        <div><label className="lbl">Nama DS</label><input className="inp" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} /></div>
+        <div><label className="lbl">Kuota pagi</label><input type="number" min={0} className="inp w-20" value={f.kuota_pagi} onChange={(e) => setF({ ...f, kuota_pagi: +e.target.value })} /></div>
+        <div><label className="lbl">Kuota siang</label><input type="number" min={0} className="inp w-20" value={f.kuota_siang} onChange={(e) => setF({ ...f, kuota_siang: +e.target.value })} /></div>
+        <div><label className="lbl">Group WhatsApp</label><input className="inp" placeholder="Group ID" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} /></div>
         <button className="btn" onClick={simpan}>Simpan</button>
       </div>
-      <p className="text-sm mb-2">
-        Captain: <b>{cap ? `${cap.nama} (${cap.email})` : 'belum ditunjuk'}</b>
-      </p>
+      <div className="flex items-center gap-2 mb-2 pt-3 border-t border-zinc-100">
+        <span className="lbl !mb-0">Captain</span>
+        {cap ? <span className="badge bg-brand-soft text-brand-dark">{cap.nama} · {cap.email}</span> : <span className="badge bg-zinc-200 text-zinc-600">belum ditunjuk</span>}
+      </div>
       <div className="flex flex-wrap gap-2 items-center">
         <RiderPick riders={candidates} value={pick} onChange={setPick} placeholder="Tunjuk Captain" />
         <input className="inp" placeholder="Email Captain" value={email} onChange={(e) => setEmail(e.target.value)} />

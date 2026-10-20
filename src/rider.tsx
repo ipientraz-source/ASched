@@ -3,9 +3,9 @@ import { sb, today, hari, useRows, Err, type Me } from './lib'
 const SHIFT: Record<string, string> = { pagi: 'Pagi', siang: 'Siang', off: 'Libur' }
 
 function List({ rows }: { rows: { tanggal: string; shift: string; ds?: string | null }[] }) {
-  if (!rows.length) return <p className="text-slate-500">Belum ada jadwal ke depan.</p>
+  if (!rows.length) return <p className="text-zinc-500">Belum ada jadwal ke depan.</p>
   return (
-    <ul className="divide-y bg-white rounded border border-slate-200">
+    <ul className="divide-y bg-white rounded border border-zinc-200">
       {rows.map((r) => (
         <li key={r.tanggal} className="flex justify-between px-3 py-2">
           <span>{hari(r.tanggal)}</span>

@@ -25,10 +25,10 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 mb-4 text-center">
-        <div className="card !mb-0"><div className="text-2xl font-semibold">{rs.rows.length}</div>Total rider</div>
-        <div className="card !mb-0"><div className="text-2xl font-semibold">{aktif}</div>Aktif</div>
-        <div className="card !mb-0"><div className="text-2xl font-semibold">{rs.rows.filter((r) => !r.ds_id && r.peran === 'rider').length}</div>Kolam bebas</div>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="stat"><b>{rs.rows.length}</b><span>Total rider</span></div>
+        <div className="stat"><b>{aktif}</b><span>Aktif</span></div>
+        <div className="stat"><b>{rs.rows.filter((r) => !r.ds_id && r.peran === 'rider').length}</b><span>Kolam bebas</span></div>
       </div>
       <div className="flex flex-wrap gap-2 mb-3">
         <input className="inp" placeholder="cari nama / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -71,7 +71,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
                 </td>
                 <td>{r.peran}</td>
                 <td>
-                  <button className={r.status === 'aktif' ? 'btn2 text-green-700' : 'btn2 text-slate-500'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
+                  <button className={r.status === 'aktif' ? 'btn2 text-green-700' : 'btn2 text-zinc-500'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
                     {r.status}
                   </button>
                 </td>
@@ -145,7 +145,7 @@ function ImportCsv({ done }: { done: () => void }) {
   return (
     <div className="card">
       <b className="block mb-1">Import CSV rider</b>
-      <p className="text-xs text-slate-500 mb-2">
+      <p className="text-xs text-zinc-500 mb-2">
         Kolom: kode_mtr, nama, no_hp, ds, status. Nama DS harus persis sama dengan DS yang sudah dibuat. Rider yang sudah ada di-update, yang baru ditambah, yang tidak ada di file dibiarkan.{' '}
         <button className="underline" onClick={() => download('template-rider.csv', 'kode_mtr,nama,no_hp,ds,status\r\nMTR001,Budi,0812xxxx,Galaxy,aktif')}>
           Unduh template
@@ -188,7 +188,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
         {res.map((r) => (
           <li key={r.id} className="flex items-center gap-2 py-1">
             <span>{r.nama}</span>
-            <span className="text-slate-400">{r.ds_nama ?? 'kolam bebas'}</span>
+            <span className="text-zinc-400">{r.ds_nama ?? 'kolam bebas'}</span>
             <button
               className="btn2 ml-auto"
               disabled={r.ds_id === ds.id}

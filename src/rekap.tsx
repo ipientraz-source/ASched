@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { sb, today, monday, addDays, hari, useRows, ok, Err, toCsv, download, type Ds, type Me } from './lib'
+import { WARNA } from './daily'
 
 type DsRow = {
   ds_id: string; ds_nama: string; dijadwalkan: number; terisi: number; patuh: number; alpha: number; tukar: number
@@ -34,7 +35,7 @@ function useRange() {
         <option value="bulanan">Bulanan</option>
       </select>
       <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
-      <span className="text-sm text-slate-600">
+      <span className="text-sm text-zinc-600">
         {from} s/d {to}
       </span>
     </div>
@@ -75,10 +76,10 @@ function Top({ title, rows, k }: { title: string; rows: RiderRow[]; k: 'alpha' |
       <ol className="list-decimal ml-5 mt-1 text-sm">
         {t.map((r) => (
           <li key={r.rider_id}>
-            {r.nama} <span className="text-slate-400">({r.ds_nama ?? '-'})</span> — {r[k]}×
+            {r.nama} <span className="text-zinc-400">({r.ds_nama ?? '-'})</span> — {r[k]}×
           </li>
         ))}
-        {!t.length && <li className="list-none text-slate-500">Tidak ada.</li>}
+        {!t.length && <li className="list-none text-zinc-500">Tidak ada.</li>}
       </ol>
     </div>
   )
@@ -101,10 +102,18 @@ export function Dashboard() {
     [],
   )
   const kosong = d.rows.filter((x) => x.hari_belum_isi > 0)
+  const sum = (k: 'dijadwalkan' | 'terisi' | 'patuh' | 'alpha') => d.rows.reduce((a, x) => a + x[k], 0)
+  const kepatuhan = sum('terisi') > 0 ? Math.round((100 * sum('patuh')) / sum('terisi')) + '%' : '–'
   return (
     <div>
       {ui}
       <Err msg={d.err || r.err} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="stat"><b>{kepatuhan}</b><span>Kepatuhan jadwal</span></div>
+        <div className="stat"><b>{sum('dijadwalkan')}</b><span>Shift dijadwalkan</span></div>
+        <div className="stat"><b className={sum('alpha') ? '!text-red-600' : ''}>{sum('alpha')}</b><span>Alpha</span></div>
+        <div className="stat"><b className={kosong.length ? '!text-red-600' : ''}>{kosong.length}</b><span>DS belum isi actual</span></div>
+      </div>
       {kosong.length > 0 && (
         <div className="bg-red-50 border border-red-300 rounded p-3 mb-4 text-sm">
           <b>DS belum isi actual:</b>
@@ -136,7 +145,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {pindah.rows.map((p: Any, i: number) => (
               <li key={i}>
-                {p.rider?.nama}: {p.dari?.nama ?? 'kolam bebas'} → {p.ke?.nama ?? 'kolam bebas'} <span className="text-slate-400">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
+                {p.rider?.nama}: {p.dari?.nama ?? 'kolam bebas'} → {p.ke?.nama ?? 'kolam bebas'} <span className="text-zinc-400">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -146,7 +155,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {log.rows.map((l: Any, i: number) => (
               <li key={i}>
-                {l.captain?.nama}: {l.aksi} <span className="text-slate-400">{l.detail} · {jam(l.waktu)}</span>
+                {l.captain?.nama}: {l.aksi} <span className="text-zinc-400">{l.detail} · {jam(l.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -208,7 +217,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
           <tbody>
             {rRows.map((x) => (
               <tr key={x.rider_id}>
-                <td>{x.nama} <span className="text-slate-400">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
+                <td>{x.nama} <span className="text-zinc-400">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
                 <td className={x.alpha ? 'text-red-600 font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
               </tr>
             ))}
@@ -224,13 +233,13 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
           <tbody>
             {det.rows.slice(0, 200).map((x: Any, i: number) => (
               <tr key={i}>
-                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td>{x.status}</td><td>{x.backup?.nama}</td><td>{x.penjelasan}</td>
+                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama}</td><td>{x.penjelasan}</td>
                 <td className="text-xs">{x.oleh?.nama} · {jam(x.jam_input)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {det.rows.length > 200 && <p className="text-xs text-slate-500 mt-1">Menampilkan 200 pertama — ekspor CSV untuk semuanya.</p>}
+        {det.rows.length > 200 && <p className="text-xs text-zinc-500 mt-1">Menampilkan 200 pertama — ekspor CSV untuk semuanya.</p>}
       </div>
       {dsId && <Kunci dsId={dsId} />}
     </div>

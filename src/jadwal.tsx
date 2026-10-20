@@ -62,7 +62,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             {shown.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">
-                  {r.nama} <span className="text-slate-400">{r.kode_mtr}</span>
+                  {r.nama} <span className="text-zinc-400">{r.kode_mtr}</span>
                 </td>
                 {days.map((d) => {
                   const k = `${r.id}|${d}`
@@ -83,7 +83,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                 })}
               </tr>
             ))}
-            <tr className="bg-slate-50 font-medium">
+            <tr className="bg-zinc-50 font-medium">
               <td>Terisi / kuota</td>
               {days.map((d) => {
                 const p = cnt(d, 'pagi')
@@ -100,7 +100,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
           </tbody>
         </table>
       </div>
-      {editable && <p className="text-xs text-slate-500 mt-2">Kuota hanya peringatan (kuning = belum pas), jadwal tetap bisa disimpan.</p>}
+      {editable && <p className="text-xs text-zinc-500 mt-2">Kuota hanya peringatan (kuning = belum pas), jadwal tetap bisa disimpan.</p>}
     </div>
   )
 }
@@ -123,7 +123,7 @@ export function JadwalSemua() {
           </option>
         ))}
       </select>
-      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-slate-500">Belum ada DS.</p>}
+      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-zinc-500">Belum ada DS.</p>}
     </div>
   )
 }
