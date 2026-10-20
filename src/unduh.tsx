@@ -51,7 +51,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
   const lebarSel = padat ? 30 : 84
   const lebar = Math.max(1000, 56 + 330 + 84 + days.length * lebarSel)
   const tinggiPdf = Math.round((lebar * 210) / 297) // rasio A4 landscape
-  const barisH = padat ? 34 : 46
+  const barisH = padat ? 42 : 52 // dua baris: nama + kode MTR (tidak dipotong)
   const sisa = tinggiPdf - 150 - (padat ? 92 : 70) - 78 - 40 - 56
   const perHalaman = Math.max(4, Math.floor(sisa / barisH))
   const halaman = mode === 'pdf' ? potong(riders, perHalaman) : [riders] // PNG: satu gambar utuh; PDF: dibagi per halaman
@@ -131,7 +131,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
             <span className="flex items-center gap-1.5"><Sel v="" padat={false} /> libur</span>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="overflow-hidden rounded-2xl border-2 border-[#aeb3c4] bg-card">
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }} className="text-sm">
             <colgroup>
               <col style={{ width: 330 }} />
@@ -139,35 +139,35 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
               <col style={{ width: 84 }} />
             </colgroup>
             <thead>
-              <tr className="border-b border-border bg-muted">
+              <tr className="bg-muted" style={{ borderBottom: '2px solid #aeb3c4' }}>
                 <th className="py-2 pl-4 text-left font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rider</th>
                 {days.map((d, i) => {
                   const akhirPekan = ['Sab', 'Min'].includes(namaHari(d))
                   const tandaBulan = i === 0 || d.slice(8) === '01'
                   return (
-                    <th key={d} className={`py-1.5 text-center ${akhirPekan ? 'bg-primary-soft' : ''}`}>
+                    <th key={d} className={`border-l border-[#c9ccd8] py-1.5 text-center ${akhirPekan ? 'bg-primary-soft' : ''}`}>
                       <div className="h-3 text-[9px] font-bold uppercase text-primary">{tandaBulan ? bulanDi(d) : ''}</div>
                       <div className={`font-mono font-semibold uppercase ${akhirPekan ? 'text-primary' : 'text-muted-foreground'} ${padat ? 'text-[9px]' : 'text-[10px]'}`}>{namaHari(d)}</div>
                       <div className={`font-bold ${padat ? 'text-xs' : 'text-base'}`}>{d.slice(8)}</div>
                     </th>
                   )
                 })}
-                <th className="py-2 text-center font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Hari kerja</th>
+                <th className="border-l border-[#c9ccd8] py-2 text-center font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Hari kerja</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={r.id} className={`border-b border-border ${i % 2 ? 'bg-muted/60' : ''}`} style={{ height: barisH }}>
-                  <td className="truncate pl-4 pr-2">
-                    <span className="mr-2 inline-flex size-5 items-center justify-center rounded-md bg-muted font-mono text-[10px] font-bold text-muted-foreground">{hal * perHalaman + i + 1}</span>
-                    <span className="font-semibold">{r.nama}</span> <span className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</span>
+                <tr key={r.id} className={`border-b border-[#c3c7d4] ${i % 2 ? 'bg-muted/60' : ''}`} style={{ height: barisH }}>
+                  <td className="py-1 pl-4 pr-2">
+                    <div className="flex items-center gap-2.5"><span className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-[10px] font-bold text-muted-foreground">{hal * perHalaman + i + 1}</span>
+                    <div className="leading-tight"><div className="font-semibold">{r.nama}</div><div className="mt-0.5 font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</div></div></div>
                   </td>
                   {days.map((d) => (
-                    <td key={d} className={`text-center ${['Sab', 'Min'].includes(namaHari(d)) ? 'bg-primary-soft/60' : ''}`}>
+                    <td key={d} className={`border-l border-[#dcdfe8] text-center ${['Sab', 'Min'].includes(namaHari(d)) ? 'bg-primary-soft/60' : ''}`}>
                       <Sel v={g[`${r.id}|${d}`] ?? ''} padat={padat} />
                     </td>
                   ))}
-                  <td className="text-center">
+                  <td className="border-l border-[#dcdfe8] text-center">
                     <span className="inline-block min-w-8 rounded-full bg-primary-soft px-2 py-0.5 font-mono text-xs font-bold text-primary-soft-foreground">{days.filter((d) => ['pagi', 'siang'].includes(g[`${r.id}|${d}`])).length}</span>
                   </td>
                 </tr>
@@ -177,7 +177,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
               )}
             </tbody>
             <tfoot>
-              <tr className="bg-muted">
+              <tr className="bg-muted" style={{ borderTop: '2px solid #aeb3c4' }}>
                 <td className="py-2 pl-4 text-xs font-semibold">
                   Terisi / kebutuhan client
                   <div className="text-[10px] font-normal text-muted-foreground">Kebutuhan bisa berbeda tiap hari; +cad = rider cadangan</div>
@@ -188,7 +188,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
                   const k = data.kuota[d] ?? { pagi: 0, siang: 0, cadangan: 0 }
                   const lebih = Math.max(0, p - k.pagi) + Math.max(0, s - k.siang)
                   return (
-                    <td key={d} className="py-1.5 text-center font-mono text-[10px] font-semibold leading-snug">
+                    <td key={d} className="border-l border-[#dcdfe8] py-1.5 text-center font-mono text-[10px] font-semibold leading-snug">
                       <div className={warnaKuota(p, k.pagi, lebih, k.cadangan)}>{padat ? `P${p}` : `P ${p}/${k.pagi}`}</div>
                       <div className={warnaKuota(s, k.siang, lebih, k.cadangan)}>{padat ? `S${s}` : `S ${s}/${k.siang}`}</div>
                       {k.cadangan > 0 && !padat && <div className="text-[9px] font-normal text-muted-foreground">+{k.cadangan} cad</div>}
