@@ -136,7 +136,7 @@ test('Arcon bisa mengunci absensi mingguan DS yang dipegang, bukan DS lain', asy
     await q('select kunci_periode($1::uuid, $2::date)', [ALSUT, d.w]) // DS kedua milik Arcon yang sama
   })
   await as(CG, async () => {
-    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'alpha')", [d.w, R_G]), /sudah dikunci/)
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'alpha', null, null, true)", [d.w, R_G]), /sudah dikunci/)
   })
 })
 
@@ -167,7 +167,7 @@ test('Super-admin bisa menyusun jadwal DS mana pun (tercatat di log); Arcon dan 
 test('Super-admin akses penuh absensi: isi, koreksi, hapus di DS mana pun; kunci tetap menolak sampai dibuka Super-admin', async () => {
   const w = (await q(`select (date_trunc('week', today_wib()) - interval '7 days')::date::text w`))[0].w
   await as(S, async () => {
-    await q("select catat_actual($1::date, $2::uuid, 'alpha', null, 'dadakan')", [w, R_W]) // rider Gowa, tanpa jadi Captain Gowa
+    await q("select catat_actual($1::date, $2::uuid, 'alpha', null, 'dadakan', true)", [w, R_W]) // rider Gowa, tanpa jadi Captain Gowa
     const a = (await q('select ds_id, diinput_oleh, status from actual_harian where rider_id = $1 and tanggal = $2', [R_W, w]))[0]
     assert.deepEqual([a.ds_id, a.diinput_oleh, a.status], [GOWA, id(1), 'alpha']) // DS diturunkan dari rider; jejak atas nama Super-admin
     await q("select catat_actual($1::date, $2::uuid, 'hadir')", [w, R_W]) // koreksi
@@ -175,11 +175,11 @@ test('Super-admin akses penuh absensi: isi, koreksi, hapus di DS mana pun; kunci
     await assert.rejects(q("select catat_actual(today_wib(), $1::uuid, 'hadir')", [id(24)]), /belum punya DS/) // rider tanpa DS: pesan jelas
     // kunci periode tetap berlaku untuk siapa pun, termasuk Super-admin
     await q('select kunci_periode($1::uuid, $2::date)', [GOWA, w])
-    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'alpha')", [w, R_W]), /sudah dikunci/)
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'alpha', null, null, true)", [w, R_W]), /sudah dikunci/)
     // Super-admin membuka kunci → koreksi boleh lagi, dan pembukaan tercatat
     await q('select buka_kunci($1::uuid, $2::date)', [GOWA, w])
     await assert.rejects(q('select buka_kunci($1::uuid, $2::date)', [GOWA, w]), /tidak sedang dikunci/)
-    await q("select catat_actual($1::date, $2::uuid, 'izin', null, 'ke dokter')", [w, R_W])
+    await q("select catat_actual($1::date, $2::uuid, 'izin', null, 'ke dokter', false)", [w, R_W])
     const b = (await q('select status, periode_terkunci from actual_harian where rider_id = $1 and tanggal = $2', [R_W, w]))[0]
     assert.deepEqual([b.status, b.periode_terkunci], ['izin', false])
     await q('select hapus_actual($1::date, $2::uuid)', [w, R_W])

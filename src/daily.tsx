@@ -1,8 +1,40 @@
 import { useState } from 'react'
 import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 
-type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null }
-type Catat = (rider: string, status: string, backup?: string, teks?: string) => Promise<boolean>
+type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null; potongan: boolean | null; insentif: number }
+// potongan: Ya/Tidak untuk alpha/izin/sakit; insentif: nominal rupiah untuk rider pengganti
+type Catat = (rider: string, status: string, backup?: string, teks?: string, potongan?: boolean | null, insentif?: number) => Promise<boolean>
+
+const rupiah = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
+const angka = (s: string) => parseInt(s.replace(/\D/g, ''), 10) || 0
+
+// Dua pilihan berdampingan (mis. Ya / Tidak); opsi ketiga true = pilihan netral (warna gelap)
+function Pilih({ nilai, ubah, opsi }: { nilai: string; ubah: (v: string) => void; opsi: [string, string, boolean?][] }) {
+  return (
+    <span role="group" className="inline-flex overflow-hidden rounded-lg border border-input">
+      {opsi.map(([v, label, netral]) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={nilai === v}
+          onClick={() => ubah(v)}
+          className={`px-3.5 py-1.5 text-sm font-semibold transition-colors ${nilai === v ? (netral ? 'bg-foreground text-background' : 'bg-primary text-primary-foreground') : 'bg-card text-muted-foreground hover:bg-muted'}`}
+        >
+          {label}
+        </button>
+      ))}
+    </span>
+  )
+}
+
+function Nominal({ nilai, ubah }: { nilai: string; ubah: (v: string) => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+      Rp
+      <input className="inp w-40" inputMode="numeric" placeholder="Nominal, mis. 50000" value={nilai} onChange={(e) => ubah(e.target.value.replace(/\D/g, '').slice(0, 9))} />
+    </span>
+  )
+}
 
 const ALASAN: [string, string][] = [
   ['alpha', 'Tidak hadir tanpa kabar (Alpha)'],
@@ -42,7 +74,7 @@ function DailyInner({ ds }: { ds: Ds }) {
   const riders = useRows<Rider>(() => sb.from('riders').select('*').eq('ds_id', ds.id).eq('status', 'aktif').order('nama'), [ds.id])
   const jd = useRows<{ rider_id: string; shift: string }>(() => sb.from('jadwal').select('rider_id,shift').eq('ds_id', ds.id).eq('tanggal', tgl), [ds.id, tgl])
   const ac = useRows<Act>(
-    () => sb.from('actual_harian').select('rider_id,status,backup_untuk_id,penjelasan').eq('ds_id', ds.id).eq('tanggal', tgl),
+    () => sb.from('actual_harian').select('rider_id,status,backup_untuk_id,penjelasan,potongan,insentif').eq('ds_id', ds.id).eq('tanggal', tgl),
     [ds.id, tgl],
   )
   const lock = useRows<{ minggu_mulai: string }>(
@@ -60,9 +92,9 @@ function DailyInner({ ds }: { ds: Ds }) {
   const terisi = terjadwal.filter((r) => act(r.id)).length
   const pg = usePage(shown, [q, tgl])
 
-  const catat: Catat = async (rider, status, backup, teks) => {
+  const catat: Catat = async (rider, status, backup, teks, potongan, insentif) => {
     const done = await ok(
-      sb.rpc('catat_actual', { p_tanggal: tgl, p_rider: rider, p_status: status, p_backup: backup || null, p_penjelasan: teks || null }),
+      sb.rpc('catat_actual', { p_tanggal: tgl, p_rider: rider, p_status: status, p_backup: backup || null, p_penjelasan: teks || null, p_potongan: potongan ?? null, p_insentif: insentif ?? 0 }),
     )
     if (done) ac.reload()
     return done
@@ -129,10 +161,24 @@ function Baris({
   const [alasan, setAlasan] = useState('alpha')
   const [backup, setBackup] = useState('')
   const [teks, setTeks] = useState('')
+  const [potongan, setPotongan] = useState('ya') // saran awal: Alpha = Ya, Izin/Sakit = Tidak; Captain bisa mengubah
+  const [ins, setIns] = useState(false)
+  const [nominal, setNominal] = useState('')
 
+  const gantiAlasan = (v: string) => {
+    setAlasan(v)
+    setPotongan(v === 'alpha' ? 'ya' : 'tidak')
+    if (v !== 'alpha') {
+      setIns(false)
+      setNominal('')
+    }
+  }
   const simpan = async () => {
     if (alasan === 'tukar' && !backup) return toast('Pilih rekan yang bertukar')
-    if (await catat(r.id, alasan, alasan === 'alpha' || alasan === 'tukar' ? backup : undefined, teks)) setBuka(false)
+    const adaIns = alasan === 'alpha' && !!backup && ins
+    if (adaIns && angka(nominal) <= 0) return toast('Isi nominal insentif lebih dari 0')
+    const pot = alasan === 'tukar' ? undefined : potongan === 'ya'
+    if (await catat(r.id, alasan, alasan === 'alpha' || alasan === 'tukar' ? backup : undefined, teks, pot, adaIns ? angka(nominal) : 0)) setBuka(false)
   }
 
   return (
@@ -148,6 +194,9 @@ function Baris({
             {act.status === 'pengganti' && act.backup_untuk_id ? ` untuk ${nama(act.backup_untuk_id)}` : ''}
           </span>
         )}
+        {act?.potongan === true && <span className="badge bg-danger-soft text-danger">Potongan: Ya</span>}
+        {act?.potongan === false && <span className="badge bg-muted text-muted-foreground">Tanpa potongan</span>}
+        {!!act?.insentif && <span className="badge bg-success-soft text-success">+ Insentif {rupiah(act.insentif)}</span>}
         {act?.penjelasan && <span className="text-xs text-muted-foreground">“{act.penjelasan}”</span>}
         <div className="ml-auto flex gap-2">
           <button className="btn btn-lg" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
@@ -165,12 +214,26 @@ function Baris({
       </div>
       {buka && (
         <div className="mt-2 pt-2 border-t flex flex-wrap gap-2 items-center">
-          <Select className="w-72 max-w-full" value={alasan} onChange={setAlasan} opsi={ALASAN.map(([value, label]) => ({ value, label }))} />
+          <Select className="w-72 max-w-full" value={alasan} onChange={gantiAlasan} opsi={ALASAN.map(([value, label]) => ({ value, label }))} />
           {(alasan === 'alpha' || alasan === 'tukar') && (
             <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Pengganti / backup (opsional)'} />
           )}
           {alasan !== 'tukar' && (
             <input className="inp flex-1 min-w-40" placeholder={alasan === 'sakit' ? 'Keterangan (opsional)' : 'Keterangan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
+          )}
+          {alasan !== 'tukar' && (
+            <div className="flex basis-full flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Kena potongan gaji (deduction)?</span>
+              <Pilih nilai={potongan} ubah={setPotongan} opsi={[['ya', 'Ya'], ['tidak', 'Tidak', true]]} />
+              <span className="text-xs text-muted-foreground">Saran: {alasan === 'alpha' ? 'Ya' : 'Tidak'} untuk {alasan === 'alpha' ? 'tidak hadir tanpa kabar' : alasan}. Bisa diubah.</span>
+            </div>
+          )}
+          {alasan === 'alpha' && backup && (
+            <div className="flex basis-full flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Insentif untuk pengganti?</span>
+              <Pilih nilai={ins ? 'ya' : 'tidak'} ubah={(v) => { setIns(v === 'ya'); if (v !== 'ya') setNominal('') }} opsi={[['tidak', 'Tanpa insentif', true], ['ya', '+ Insentif']]} />
+              {ins && <Nominal nilai={nominal} ubah={setNominal} />}
+            </div>
           )}
           <button className="btn" onClick={simpan}>
             Simpan
@@ -184,6 +247,8 @@ function Baris({
 function TambahPengganti({ kandidat, terjadwal, locked, catat }: { kandidat: Rider[]; terjadwal: Rider[]; locked: boolean; catat: Catat }) {
   const [rid, setRid] = useState('')
   const [gt, setGt] = useState('')
+  const [ins, setIns] = useState(false)
+  const [nominal, setNominal] = useState('')
   return (
     <div className="card mt-4">
       <b className="block mb-2">Tambah rider pengganti</b>
@@ -191,13 +256,21 @@ function TambahPengganti({ kandidat, terjadwal, locked, catat }: { kandidat: Rid
       <div className="flex flex-wrap gap-2 items-center">
         <RiderPick riders={kandidat} value={rid} onChange={setRid} placeholder="Rider pengganti" />
         <RiderPick riders={terjadwal} value={gt} onChange={setGt} placeholder="Menggantikan siapa? (opsional)" />
+        <div className="flex basis-full flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Insentif untuk pengganti?</span>
+          <Pilih nilai={ins ? 'ya' : 'tidak'} ubah={(v) => { setIns(v === 'ya'); if (v !== 'ya') setNominal('') }} opsi={[['tidak', 'Tanpa insentif', true], ['ya', '+ Insentif']]} />
+          {ins && <Nominal nilai={nominal} ubah={setNominal} />}
+        </div>
         <button
           className="btn"
           disabled={!rid || locked}
           onClick={async () => {
-            if (await catat(rid, 'pengganti', gt)) {
+            if (ins && angka(nominal) <= 0) return toast('Isi nominal insentif lebih dari 0')
+            if (await catat(rid, 'pengganti', gt, undefined, null, ins ? angka(nominal) : 0)) {
               setRid('')
               setGt('')
+              setIns(false)
+              setNominal('')
             }
           }}
         >

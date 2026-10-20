@@ -21,8 +21,9 @@ async function as(email, fn) {
     await db.exec(`reset role; select set_config('request.jwt.claims', '', false)`)
   }
 }
-const catat = (tgl, rider, status, backup = null, teks = null) =>
-  q('select catat_actual($1::date, $2::uuid, $3::actual_status_t, $4::uuid, $5::text)', [tgl, rider, status, backup, teks])
+// potongan wajib dijawab untuk alpha/izin/sakit; bawaan di tes: Ya
+const catat = (tgl, rider, status, backup = null, teks = null, potongan = ['alpha', 'izin', 'sakit'].includes(status) ? true : null, insentif = 0) =>
+  q('select catat_actual($1::date, $2::uuid, $3::actual_status_t, $4::uuid, $5::text, $6::boolean, $7::int)', [tgl, rider, status, backup, teks, potongan, insentif])
 
 before(async () => {
   await db.exec(`
@@ -148,6 +149,47 @@ test('Daily report: backup ter-link satu paket, validasi alasan, tanggal mendata
     await catat(today, R2, 'pengganti', null) // pengganti tanpa dijadwalkan (mandiri)
     await q('select hapus_actual($1::date, $2::uuid)', [today, R2])
     assert.equal((await q('select * from actual_harian where rider_id = $1 and tanggal = $2', [R2, today])).length, 0)
+  })
+})
+
+test('Potongan (Ya/Tidak) untuk alpha/izin/sakit dan insentif nominal bebas untuk pengganti; masuk laporan', async () => {
+  const today = (await q('select today_wib()::text t'))[0].t
+  const baris = (rid) => q('select status, potongan, insentif from actual_harian where rider_id = $1 and tanggal = $2', [rid, today])
+  await as(A, async () => {
+    // potongan wajib dijawab untuk alpha / izin / sakit
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'alpha')", [today, R1]), /kena potongan/)
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'sakit')", [today, R1]), /kena potongan/)
+    // Alpha + pengganti + insentif: potongan di rider yang absen, insentif di baris pengganti
+    await catat(today, R1, 'alpha', R2, 'dadakan', true, 75000)
+    assert.deepEqual(await baris(R1), [{ status: 'alpha', potongan: true, insentif: 0 }])
+    assert.deepEqual(await baris(R2), [{ status: 'pengganti', potongan: null, insentif: 75000 }])
+    const lap = await q('select rider_id, potongan, insentif::int from laporan_rider(today_wib(), today_wib())')
+    assert.equal(lap.find((x) => x.rider_id === R1).potongan, 1)
+    assert.equal(lap.find((x) => x.rider_id === R2).insentif, 75000)
+    // insentif hanya untuk pengganti; tidak boleh negatif
+    await assert.rejects(catat(today, R1, 'izin', null, 'x', false, 1000), /Insentif hanya untuk rider pengganti/)
+    await assert.rejects(catat(today, R1, 'alpha', null, 'x', true, 1000), /Insentif hanya untuk rider pengganti/) // tanpa pengganti
+    await assert.rejects(catat(today, R1, 'tukar', R2, 'x', null, 1000), /Insentif hanya untuk rider pengganti/)
+    await assert.rejects(catat(today, R1, 'alpha', R2, 'x', true, -5), /tidak boleh negatif/)
+    // izin tanpa potongan; ganti ke izin menghapus pengganti beserta insentifnya
+    await catat(today, R1, 'izin', null, 'ke dokter', false)
+    assert.deepEqual(await baris(R1), [{ status: 'izin', potongan: false, insentif: 0 }])
+    assert.equal((await baris(R2)).length, 0)
+    // potongan diabaikan untuk status lain (hadir)
+    await catat(today, R1, 'hadir', null, null, true)
+    assert.deepEqual(await baris(R1), [{ status: 'hadir', potongan: null, insentif: 0 }])
+    // pengganti mandiri dengan insentif berbeda-beda
+    await catat(today, R2, 'pengganti', null, null, null, 20000)
+    assert.equal((await baris(R2))[0].insentif, 20000)
+    await catat(today, R2, 'pengganti', null, null, null, 0)
+    assert.equal((await baris(R2))[0].insentif, 0)
+    await q('select hapus_actual($1::date, $2::uuid)', [today, R2])
+  })
+  await as(S, async () => {
+    await catat(today, R1, 'alpha', R2, null, false, 50000) // Super-admin juga boleh mengisi
+    assert.deepEqual(await baris(R2), [{ status: 'pengganti', potongan: null, insentif: 50000 }])
+    await catat(today, R1, 'hadir') // kembalikan keadaan awal
+    await q('select hapus_actual($1::date, $2::uuid)', [today, R2])
   })
 })
 
