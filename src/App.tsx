@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, ShieldCheck, TrendingUp, Users, type LucideIcon } from 'lucide-react'
+import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, ShieldCheck, TrendingUp, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { sb, store, useRows, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
 import { RiderApp, JadwalSaya } from './rider'
 import { AbsensiSemua, Daily } from './daily'
@@ -8,6 +8,7 @@ import { JadwalDs, JadwalSemua } from './jadwal'
 import { Dashboard, Rekap } from './rekap'
 import { DataRider } from './riders'
 import { Kelola } from './kelola'
+import { Pengguna } from './pengguna'
 
 type P = { me: Me; ds: Ds | null; dsList: Ds[] } // ds = DS Captain; dsList = semua DS yang dipegang Arcon
 type Tab = { nama: string; desc: string; Icon: LucideIcon; View: (p: P) => ReactElement }
@@ -19,6 +20,7 @@ const SUPER: Tab[] = [
   { nama: 'Absensi Harian', desc: 'Isi atau koreksi absensi rider di DS mana pun', Icon: ClipboardCheck, View: () => <AbsensiSemua /> },
   { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
   { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota rider, pilih Captain, dan tambah Super-admin', Icon: Building2, View: () => <Kelola /> },
+  { nama: 'Pengguna', desc: 'Semua pengguna menurut peran: Super-admin, Arcon, Captain, dan rider. Hanya Super-admin yang bisa mengubah status Arcon dan Captain.', Icon: UserCog, View: () => <Pengguna /> },
 ]
 const CAPTAIN: Tab[] = [
   { nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda sebagai rider', Icon: CalendarCheck, View: JadwalSaya },

@@ -162,6 +162,53 @@ function Langkah({ no, judul, ket, children }: { no: number; judul: string; ket:
   )
 }
 
+// Riwayat jadwal tersimpan 1 DS per minggu (26 minggu ke belakang sampai 9 minggu ke depan). Klik "Buka" memuat minggu itu di grid.
+function RiwayatJadwal({ ds, aktif, versi, buka }: { ds: Ds; aktif: string; versi: number; buka: (senin: string) => void }) {
+  const [terbuka, setTerbuka] = useState(false) // data baru diambil saat panel dibuka
+  const r = useRows<Jd>(() => (terbuka ? ambilJadwal(ds.id, addDays(today(), -182), addDays(today(), 63)) : Promise.resolve({ data: [], error: null })), [ds.id, versi, terbuka])
+  const minggu = new Map<string, { rider: Set<string>; shift: number; off: number }>()
+  for (const x of r.rows) {
+    const m = monday(x.tanggal)
+    const e = minggu.get(m) ?? { rider: new Set<string>(), shift: 0, off: 0 }
+    if (x.shift === 'off') e.off++
+    else {
+      e.shift++
+      e.rider.add(x.rider_id)
+    }
+    minggu.set(m, e)
+  }
+  const daftar = [...minggu.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  const tgl = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const sekarang = monday(today())
+  return (
+    <details className="card" onToggle={(e) => setTerbuka(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm font-semibold">Riwayat jadwal tersimpan {terbuka && <span className="font-normal text-muted-foreground">({daftar.length} minggu)</span>}</summary>
+      <Err msg={r.err} />
+      {daftar.length ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="tbl">
+            <thead><tr><th>Minggu</th><th>Rider terjadwal</th><th>Total shift</th><th>Off terkunci</th><th>Keterangan</th><th /></tr></thead>
+            <tbody>
+              {daftar.map(([sen, e]) => (
+                <tr key={sen} className={sen === monday(aktif) ? 'bg-primary-soft/60' : ''}>
+                  <td className="font-medium">{tgl(sen)} – {tgl(addDays(sen, 6))} {sen.slice(0, 4)}</td>
+                  <td className="font-mono">{e.rider.size}</td>
+                  <td className="font-mono">{e.shift}</td>
+                  <td className="font-mono text-muted-foreground">{e.off}</td>
+                  <td><span className={`badge ${sen === sekarang ? 'bg-primary-soft text-primary-soft-foreground' : sen > sekarang ? 'bg-warning-soft text-warning' : 'bg-muted text-muted-foreground'}`}>{sen === sekarang ? 'Minggu ini' : sen > sekarang ? 'Akan datang' : 'Sudah lewat'}</span></td>
+                  <td className="text-right"><button className="btn2" onClick={() => buka(sen)}>{sen === monday(aktif) ? 'Sedang dibuka' : 'Buka'}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">Belum ada jadwal tersimpan untuk DS ini.</p>
+      )}
+    </details>
+  )
+}
+
 // Ringkasan keadilan: hari kerja, pagi, siang, akhir pekan, libur tiap rider pada draf/jadwal yang sedang tampil
 function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string, StatRider> }) {
   const baris = riders.map((r) => ({ r, s: stat[r.id] })).sort((a, b) => b.s.hk - a.s.hk || a.r.nama.localeCompare(b.r.nama))
@@ -237,6 +284,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const [g, setG] = useState<Record<string, string>>({}) // "riderId|tanggal" -> pagi | siang | off
   const [kuota, setKuota] = useState<Record<string, Kq>>({}) // tanggal -> kebutuhan (hanya yang berbeda dari bawaan DS)
   const [cetak, setCetak] = useState<'png' | 'pdf' | null>(null)
+  const [versiRiwayat, setVersiRiwayat] = useState(0) // naik tiap kali jadwal disimpan, supaya Riwayat jadwal ikut diperbarui
   const [pertahankan, setPertahankan] = useState(false) // opsi Susun otomatis: pertahankan pagi/siang yang sudah diisi
   const [pakaiCadangan, setPakaiCadangan] = useState(false) // opsi Susun otomatis: tambah cadangan sesuai pola absen
   const [pola, setPola] = useState<PolaHari[] | null>(null)
@@ -362,6 +410,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
       })
     if (await ok(sb.rpc('simpan_jadwal', { p_ds: ds.id, p_dari: days[0], p_sampai: days[days.length - 1], p_rows: rows }))) {
       toast.ok('Jadwal berhasil disimpan')
+      setVersiRiwayat((v) => v + 1)
       j.reload()
       kRows.reload()
     }
@@ -503,6 +552,9 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         )}
         Gambar dan PDF dibuat langsung di browser dan tidak disimpan di database.
       </p>
+      <div className="mt-4">
+        <RiwayatJadwal ds={ds} aktif={dari} versi={versiRiwayat} buka={(sen) => { setMode('minggu'); pasang(sen, addDays(sen, 6)); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
+      </div>
       {riders.rows.length > 0 && (
         <div className="mt-4">
           <PanelKeadilan riders={riders.rows} stat={stat} />

@@ -70,7 +70,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
                 </td>
                 <td><span className="badge bg-muted text-foreground/80 capitalize">{r.peran.replace('_', '-')}</span></td>
                 <td>
-                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
+                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && (r.ds_id !== ds?.id || r.peran !== 'rider')} title={!sup && r.peran !== 'rider' ? 'Hanya Super-admin yang bisa mengubah status Arcon dan Captain' : undefined} onClick={() => setStatus(r)}>
                     {r.status}
                   </button>
                 </td>

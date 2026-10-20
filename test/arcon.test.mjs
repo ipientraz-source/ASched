@@ -76,6 +76,26 @@ test('Arcon B memegang 1 DS: hanya Gowa. Captain tetap hanya DS-nya sendiri', as
   })
 })
 
+test('Status Arcon dan Captain hanya bisa diubah Super-admin; Captain tetap bisa mengubah status rider DS-nya', async () => {
+  const ubah = (rid, st) => q('update riders set status = $2 where id = $1 returning id', [rid, st])
+  await as(CG, async () => {
+    await assert.rejects(ubah(R_CG, 'nonaktif'), /Hanya Super-admin yang boleh mengubah status Arcon dan Captain/) // dirinya sendiri
+    assert.equal((await ubah(R_G, 'nonaktif')).length, 1) // rider DS-nya: boleh
+    assert.equal((await ubah(R_G, 'aktif')).length, 1)
+    assert.equal((await ubah(R_CA, 'nonaktif')).length, 0) // Captain DS lain: tak terlihat, tak terubah
+  })
+  await as(AA, async () => {
+    assert.equal((await ubah(R_CG, 'nonaktif')).length, 0) // Arcon tak punya hak tulis
+  })
+  await as(S, async () => {
+    assert.equal((await ubah(R_CG, 'nonaktif')).length, 1)
+    assert.equal((await ubah(R_CG, 'aktif')).length, 1)
+    assert.equal((await ubah(R_AB, 'nonaktif')).length, 1)
+    assert.equal((await ubah(R_AB, 'aktif')).length, 1)
+  })
+  assert.equal((await q("select count(*)::int n from riders where status = 'nonaktif'"))[0].n, 0)
+})
+
 test('Arcon hanya memantau: tidak bisa menyusun jadwal, mengisi absensi, tarik rider, atau menulis langsung', async () => {
   await as(AA, async () => {
     await assert.rejects(q("select catat_actual(today_wib(), $1::uuid, 'hadir')", [R_G]), /Hanya Captain/)
