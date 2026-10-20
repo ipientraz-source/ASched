@@ -23,7 +23,8 @@ export function Kelola() {
   const rs = useRows<Rider>(() => sb.from('riders').select('*').order('nama').limit(1000), [])
   const [nama, setNama] = useState('')
   const [cari, setCari] = useState('')
-  const candidates = rs.rows.filter((r) => r.peran !== 'super_admin' && r.status === 'aktif')
+  const candidates = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'captain') && r.status === 'aktif')
+  const kandidatArcon = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'arcon') && r.status === 'aktif') // Captain tidak bisa merangkap Arcon
   const tampil = dsl.rows.filter((d) => (d.nama + (rs.rows.find((r) => r.id === d.captain_id)?.nama ?? '')).toLowerCase().includes(cari.toLowerCase()))
   const pg = usePage(tampil, [cari])
 
@@ -76,7 +77,7 @@ export function Kelola() {
         <span className="text-sm text-muted-foreground">{tampil.length} DS</span>
       </div>
       {pg.rows.map((d) => (
-        <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} reload={() => { dsl.reload(); rs.reload() }} />
+        <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} kandidatArcon={kandidatArcon} semuaDs={dsl.rows} reload={() => { dsl.reload(); rs.reload() }} />
       ))}
       {!tampil.length && <div className="card text-center text-muted-foreground text-sm">{dsl.rows.length ? 'Tidak ada DS yang cocok dengan pencarian.' : 'Belum ada DS. Buat yang pertama di atas.'}</div>}
 
@@ -87,7 +88,28 @@ export function Kelola() {
   )
 }
 
-function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; reload: () => void }) {
+function DsCard({ d, riders, candidates, kandidatArcon, semuaDs, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; kandidatArcon: Rider[]; semuaDs: Ds[]; reload: () => void }) {
+  const [arPick, setArPick] = useState('')
+  const [arEmail, setArEmail] = useState('')
+  const [arPw, setArPw] = useState('')
+  const arc = riders.find((r) => r.id === d.arcon_id)
+  const jmlDsArcon = arc ? semuaDs.filter((x) => x.arcon_id === arc.id).length : 0
+  const kurangArcon = !arPick ? 'Pilih rider dulu' : !arEmail.trim() ? 'Isi email untuk login' : arPw && arPw.length < 8 ? 'Password minimal 8 karakter' : ''
+  const tunjukArcon = async () => {
+    if (!(await ok(sb.rpc('set_arcon', { p_ds: d.id, p_rider: arPick, p_email: arEmail })))) return
+    if (arPw) await buatAkun(arEmail, arPw)
+    setArPick('')
+    setArEmail('')
+    setArPw('')
+    toast.ok('Arcon berhasil dipilih')
+    reload()
+  }
+  const lepasArcon = async () => {
+    if (confirm(`Lepas ${arc?.nama} dari ${d.nama}? Beliau tetap memegang DS lain kalau ada.`) && (await ok(sb.rpc('lepas_arcon', { p_ds: d.id })))) {
+      toast.ok('Arcon dilepas dari DS ini')
+      reload()
+    }
+  }
   const [f, setF] = useState({ nama: d.nama, kuota_pagi: d.kuota_pagi, kuota_siang: d.kuota_siang, group_wa_id: d.group_wa_id ?? '' })
   const [pick, setPick] = useState('')
   const [email, setEmail] = useState('')
@@ -122,6 +144,7 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
           Kuota: {d.kuota_pagi} pagi + {d.kuota_siang} siang = {d.kuota_pagi + d.kuota_siang} rider per hari
         </span>
         {cap ? <span className="badge bg-primary-soft text-primary-soft-foreground">Captain: {cap.nama}</span> : <span className="badge bg-warning-soft text-warning">Belum ada Captain</span>}
+        {arc && <span className="badge bg-muted text-foreground/80">Arcon: {arc.nama}</span>}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-start">
@@ -163,6 +186,30 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
         <div className="mt-3 flex items-center gap-3">
           <button className="btn2" disabled={!!kurang} onClick={tunjuk}>{cap ? 'Ganti Captain' : 'Jadikan Captain'}</button>
           {kurang && <span className="text-xs text-muted-foreground">{kurang}</span>}
+        </div>
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border">
+        <b className="block">{arc ? 'Ganti Arcon' : 'Tunjuk Arcon (opsional)'}</b>
+        <p className="text-sm text-muted-foreground mb-3">
+          Arcon adalah atasan Captain yang memantau beberapa DS sekaligus. Satu Arcon bisa dipilih di banyak DS. Arcon hanya memantau (dashboard, rider, jadwal, laporan) dan bisa mengunci absensi mingguan.{' '}
+          {arc && <>Arcon sekarang: <b className="text-foreground">{arc.nama}</b> ({arc.email}), memegang {jmlDsArcon} DS.</>}
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+          <Field label="Rider yang jadi Arcon" hint="Pilih rider yang bukan Captain. Rider yang sudah jadi Arcon di DS lain juga bisa dipilih lagi.">
+            <RiderPick riders={kandidatArcon} value={arPick} onChange={setArPick} placeholder="— pilih rider —" />
+          </Field>
+          <Field label="Email untuk login" hint="Arcon memakai email ini untuk masuk ke aplikasi.">
+            <input className="inp w-full" type="email" placeholder="nama@email.com" value={arEmail} onChange={(e) => setArEmail(e.target.value)} />
+          </Field>
+          <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
+            <input className="inp w-full" type="password" autoComplete="new-password" value={arPw} onChange={(e) => setArPw(e.target.value)} />
+          </Field>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button className="btn2" disabled={!!kurangArcon} onClick={tunjukArcon}>{arc ? 'Ganti Arcon' : 'Jadikan Arcon'}</button>
+          {arc && <button className="btn2 !text-danger" onClick={lepasArcon}>Lepas Arcon dari DS ini</button>}
+          {kurangArcon && <span className="text-xs text-muted-foreground">{kurangArcon}</span>}
         </div>
       </div>
     </div>

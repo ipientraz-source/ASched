@@ -152,13 +152,14 @@ export function JadwalDs({ ds }: { me: Me; ds: Ds | null }) {
 }
 
 // Super-admin: lihat jadwal semua DS (read-only — penyusunan sepenuhnya di Captain)
-export function JadwalSemua() {
+export function JadwalSemua({ daftar }: { daftar?: Ds[] }) {
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
+  const rows = daftar ?? dsl.rows // Arcon: hanya DS yang dipegang; Super-admin: semua DS
   const [id, setId] = useState('')
-  const ds = dsl.rows.find((d) => d.id === (id || dsl.rows[0]?.id))
+  const ds = rows.find((d) => d.id === (id || rows[0]?.id))
   return (
     <div>
-      <Select className="mb-3 w-72 max-w-full" value={ds?.id ?? ''} onChange={setId} placeholder="Pilih DS" opsi={dsl.rows.map((d) => ({ value: d.id, label: d.nama }))} />
+      <Select className="mb-3 w-72 max-w-full" value={ds?.id ?? ''} onChange={setId} placeholder="Pilih DS" opsi={rows.map((d) => ({ value: d.id, label: d.nama }))} />
       {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
     </div>
   )

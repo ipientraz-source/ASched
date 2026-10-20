@@ -4,7 +4,7 @@ import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, usePage, Pagi
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
-export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
+export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?: Ds[] }) {
   const sup = me.peran === 'super_admin'
   const [q, setQ] = useState('')
   const [fds, setFds] = useState('')
@@ -35,8 +35,8 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
       </div>
       <div className="flex flex-wrap gap-2 mb-3">
         <input className="inp" placeholder="cari nama / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
-        {sup && (
-          <Select className="w-56" value={fds} onChange={setFds} opsi={[{ value: '', label: 'Semua DS' }, { value: '-', label: 'Belum punya DS' }, ...dsl.rows.map((d) => ({ value: d.id, label: d.nama }))]} />
+        {(sup || me.peran === 'arcon') && (
+          <Select className="w-56" value={fds} onChange={setFds} opsi={[{ value: '', label: 'Semua DS' }, ...(sup ? [{ value: '-', label: 'Belum punya DS' }] : []), ...(sup ? dsl.rows : dsList).map((d) => ({ value: d.id, label: d.nama }))]} />
         )}
         {sup && (
           <button className="btn2 ml-auto" onClick={() => download('rider.csv', toCsv(shown.map((r) => ({ kode_mtr: r.kode_mtr, nama: r.nama, no_hp: r.no_hp, ds: dsNama(r.ds_id) === '—' ? '' : dsNama(r.ds_id), status: r.status, peran: r.peran }))))}>

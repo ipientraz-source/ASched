@@ -218,13 +218,13 @@ export function Dashboard() {
 }
 
 // Super-admin: Laporan Actual · Captain: Rekap DS Saya (RLS otomatis membatasi Captain ke DS-nya)
-export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
-  const sup = me.peran === 'super_admin'
+export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?: Ds[] }) {
+  const luas = me.peran !== 'captain' // Super-admin (semua DS) dan Arcon (beberapa DS) memilih DS lewat filter
   const { from, to, ui } = useRange()
   const [dsf, setDsf] = useState('')
   const [q, setQ] = useState('')
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
-  const dsId = sup ? dsf : ds?.id ?? ''
+  const dsId = luas ? dsf : ds?.id ?? ''
   const dsNama = dsl.rows.find((x) => x.id === dsId)?.nama
   const d = useRows<DsRow>(() => sb.rpc('laporan_ds', { p_dari: from, p_sampai: to }), [from, to])
   const r = useRows<RiderRow>(() => sb.rpc('laporan_rider', { p_dari: from, p_sampai: to }), [from, to])
@@ -249,8 +249,8 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
     <div>
       {ui}
       <div className="flex flex-wrap gap-2 mb-3">
-        {sup && (
-          <Select className="w-56" value={dsf} onChange={setDsf} opsi={[{ value: '', label: 'Semua DS' }, ...dsl.rows.map((x) => ({ value: x.id, label: x.nama }))]} />
+        {luas && (
+          <Select className="w-56" value={dsf} onChange={setDsf} opsi={[{ value: '', label: 'Semua DS' }, ...(me.peran === 'super_admin' ? dsl.rows : dsList).map((x) => ({ value: x.id, label: x.nama }))]} />
         )}
         <input className="inp" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         <button className="btn2 ml-auto" onClick={() => download(`rekap-rider_${from}_${to}.csv`, toCsv(rRows as unknown as Record<string, unknown>[]))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh rekap rider</button>
@@ -292,7 +292,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
         </table></div>
         <Pagination {...pgD} />
       </div>
-      {dsId && <Kunci dsId={dsId} />}
+      {dsId ? <Kunci dsId={dsId} /> : luas && <div className="card text-sm text-muted-foreground">Pilih satu DS di atas untuk mengunci absensi mingguannya.</div>}
     </div>
   )
 }

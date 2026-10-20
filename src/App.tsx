@@ -9,7 +9,7 @@ import { Dashboard, Rekap } from './rekap'
 import { DataRider } from './riders'
 import { Kelola } from './kelola'
 
-type P = { me: Me; ds: Ds | null }
+type P = { me: Me; ds: Ds | null; dsList: Ds[] } // ds = DS Captain; dsList = semua DS yang dipegang Arcon
 type Tab = { nama: string; desc: string; Icon: LucideIcon; View: (p: P) => ReactElement }
 
 const SUPER: Tab[] = [
@@ -25,6 +25,13 @@ const CAPTAIN: Tab[] = [
   { nama: 'Jadwal DS Saya', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
   { nama: 'Rekap DS Saya', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
   { nama: 'Rider DS Saya', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
+]
+// Arcon: atasan Captain, memantau beberapa DS. Hanya melihat — jadwal dan absensi tetap dikerjakan Captain.
+const ARCON: Tab[] = [
+  { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di DS yang Anda pegang', Icon: LayoutDashboard, View: () => <Dashboard /> },
+  { nama: 'Data Rider', desc: 'Lihat rider di DS yang Anda pegang', Icon: Users, View: DataRider },
+  { nama: 'Jadwal', desc: 'Lihat jadwal DS yang Anda pegang. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: ({ dsList }) => <JadwalSemua daftar={dsList} /> },
+  { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya dan kunci absensi mingguan di DS Anda', Icon: ClipboardList, View: Rekap },
 ]
 const RIDER: Tab[] = [{ nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda', Icon: CalendarCheck, View: JadwalSaya }]
 
@@ -136,12 +143,17 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
 function AdminApp({ email }: { email: string }) {
   const [me, setMe] = useState<Me | null | undefined>(undefined)
   const [ds, setDs] = useState<Ds | null>(null)
+  const [dsList, setDsList] = useState<Ds[]>([])
   const [tab, setTab] = useState(0)
 
   useEffect(() => {
     ;(async () => {
       const { data } = await sb.from('riders').select('id,nama,peran,ds_id,email').eq('email', email.toLowerCase()).maybeSingle()
       setMe(data as Me | null)
+      if (data?.peran === 'arcon') {
+        const r = await sb.from('ds').select('*').eq('arcon_id', data.id).order('nama')
+        setDsList((r.data ?? []) as Ds[])
+      }
       if (data?.peran === 'captain') {
         const r = await sb.from('ds').select('*').eq('captain_id', data.id).maybeSingle()
         setDs(r.data as Ds | null)
@@ -161,7 +173,8 @@ function AdminApp({ email }: { email: string }) {
       </div>
     )
 
-  const tabs = me.peran === 'super_admin' ? SUPER : me.peran === 'captain' ? CAPTAIN : RIDER
+  const tabs = me.peran === 'super_admin' ? SUPER : me.peran === 'captain' ? CAPTAIN : me.peran === 'arcon' ? ARCON : RIDER
+  const lokasi = ds ? ds.nama : me.peran === 'arcon' ? `${dsList.length} DS` : ''
   const cur = tabs[tab] ?? tabs[0]
   const peran = me.peran.replace('_', '-')
   const tgl = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })
@@ -188,7 +201,7 @@ function AdminApp({ email }: { email: string }) {
           <div className="size-9 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center">{initials(me.nama)}</div>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="text-sm font-semibold text-white truncate">{me.nama}</div>
-            <div className="font-mono text-[10px] uppercase tracking-wider truncate">{peran}{ds ? ` · ${ds.nama}` : ''}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider truncate">{peran}{lokasi ? ` · ${lokasi}` : ''}</div>
           </div>
           <TemaToggle className="hover:!bg-white/10 hover:text-white" />
           <button onClick={() => sb.auth.signOut()} title="Keluar" className="p-2 rounded-md hover:bg-white/10 hover:text-white"><LogOut size={16} /></button>
@@ -200,7 +213,7 @@ function AdminApp({ email }: { email: string }) {
           <Logo small />
           <div className="flex-1 leading-tight min-w-0">
             <div className="text-sm font-semibold truncate">{me.nama}</div>
-            <div className="font-mono text-[10px] uppercase tracking-wider text-sidebar-foreground truncate">{peran}{ds ? ` · ${ds.nama}` : ''}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-sidebar-foreground truncate">{peran}{lokasi ? ` · ${lokasi}` : ''}</div>
           </div>
           <TemaToggle className="hover:!bg-white/10" />
           <button onClick={() => sb.auth.signOut()} className="p-2"><LogOut size={18} /></button>
@@ -221,7 +234,7 @@ function AdminApp({ email }: { email: string }) {
         </header>
         <main className="px-4 md:px-8 py-6 max-w-6xl">
           {me.peran === 'captain' && <Notif me={me} />}
-          <div key={tab} className="rise"><cur.View me={me} ds={ds} /></div>
+          <div key={tab} className="rise"><cur.View me={me} ds={ds} dsList={dsList} /></div>
         </main>
       </div>
     </div>
