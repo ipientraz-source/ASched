@@ -22,7 +22,7 @@ const potong = <T,>(l: T[], n: number) => (l.length ? Array.from({ length: Math.
 const warnaKuota = (n: number, q: number, lebihTotal: number, cad: number) => (n === q ? 'text-success' : n < q ? 'text-warning' : lebihTotal <= cad ? 'text-primary' : 'text-danger')
 
 function Sel({ v, padat }: { v: string; padat: boolean }) {
-  if (!v) return <span className="text-muted-foreground/40">·</span>
+  if (!v) return padat ? <span className="text-muted-foreground/40">·</span> : <span className="text-xs text-muted-foreground/60">Off</span>
   if (v === 'off')
     return padat ? (
       <span className="inline-flex size-6 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground">O</span>
@@ -112,8 +112,8 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
           <div className="mb-3 mt-3 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><Sel v="pagi" padat={false} /> shift pagi</span>
             <span className="flex items-center gap-1.5"><Sel v="siang" padat={false} /> shift siang</span>
-            <span className="flex items-center gap-1.5"><Sel v="off" padat={false} /> off terkunci (cuti/izin)</span>
-            <span className="flex items-center gap-1.5"><Sel v="" padat={false} /> kosong = libur biasa</span>
+            <span className="flex items-center gap-1.5"><Sel v="off" padat={false} /> libur terkunci (cuti/izin)</span>
+            <span className="flex items-center gap-1.5"><Sel v="" padat={false} /> libur</span>
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }} className="text-sm">

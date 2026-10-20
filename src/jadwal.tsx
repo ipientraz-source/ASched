@@ -78,13 +78,13 @@ function Pil({ v, klik, title, ringkas }: { v: string; klik?: () => void; title?
     v === 'pagi' ? 'border-transparent bg-[var(--amber-400)] text-[#451a03] shadow-[0_2px_0_#d97706]'
     : v === 'siang' ? 'border-transparent bg-primary text-primary-foreground shadow-[0_2px_0_var(--edge-primary)]'
     : v === 'off' ? 'border-input bg-muted text-foreground/70 shadow-[0_2px_0_var(--edge)]'
-    : 'border-dashed border-input text-muted-foreground'
+    : 'border-dashed border-input text-muted-foreground/70'
   const isi = ringkas
     ? v === 'pagi' ? 'P' : v === 'siang' ? 'S' : v === 'off' ? <Lock size={12} /> : '–'
     : v === 'pagi' ? <><Sunrise size={13} />Pagi</>
     : v === 'siang' ? <><Sun size={13} />Siang</>
     : v === 'off' ? <><Lock size={12} />Off</>
-    : <span title="Kosong = libur biasa">–</span>
+    : <span title="Libur biasa (tidak terkunci)">Off</span>
   const kelas = `inline-flex items-center justify-center rounded-lg border font-bold transition-all ${ringkas ? 'size-7 text-[11px]' : 'w-[4.75rem] gap-1 px-2 py-1.5 text-xs'} ${gaya}`
   return klik ? (
     <button type="button" title={title} onClick={klik} className={`${kelas} hover:scale-105 hover:border-primary ${v ? '' : 'hover:text-primary'}`}>{isi}</button>
@@ -413,7 +413,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input className="inp w-56" placeholder="Cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">Keterangan:</span> <Pil v="pagi" /> <Pil v="siang" /> <Pil v="off" /> <Pil v="" /> <span>kosong = libur biasa</span>
+          <span className="font-semibold text-foreground">Keterangan:</span> <Pil v="pagi" /> <Pil v="siang" /> <Pil v="" /> <span>libur</span> <Pil v="off" /> <span>libur terkunci (tidak diubah susun otomatis)</span>
         </div>
       </div>
       <Err msg={riders.err || j.err || kRows.err} />
