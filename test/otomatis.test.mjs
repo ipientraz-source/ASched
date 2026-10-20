@@ -1,7 +1,7 @@
 // Uji penyusun jadwal otomatis (src/otomatis.ts). Node 24 membaca TypeScript langsung.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buatDraf } from '../src/otomatis.ts'
+import { buatDraf, hitungRiwayat } from '../src/otomatis.ts'
 
 const hari7 = ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01']
 const riders = (n) => Array.from({ length: n }, (_, i) => `r${i + 1}`)
@@ -80,10 +80,86 @@ test('periode 1 hari dan periode sebulan berjalan; kuota terpenuhi bila rider cu
   assert.ok(Math.max(...n) - Math.min(...n) <= 1, `tidak merata: ${n}`)
 })
 
+// ── aturan kondisi rider & keadilan lintas periode ──
+const urutan = (grid, id, hari) => hari.map((d) => grid[`${id}|${d}`] ?? '') // mis. ['pagi','pagi','','siang']
+const langsungGanti = (seq) => seq.some((s, i) => i > 0 && s && seq[i - 1] && s !== seq[i - 1]) // pagi→siang / siang→pagi tanpa libur
+const beruntunMaks = (seq) => seq.reduce((m, s) => { m.cur = s ? m.cur + 1 : 0; m.max = Math.max(m.max, m.cur); return m }, { cur: 0, max: 0 }).max
+const barisDari = (grid) => Object.entries(grid).map(([k, shift]) => { const [rider_id, tanggal] = k.split('|'); return { rider_id, tanggal, shift } })
+
+test('shift TIDAK pernah berganti tanpa libur dulu, di berbagai konfigurasi, tanpa pelanggaran darurat', () => {
+  for (const [n, p, s, hariN] of [[5, 2, 1, 28], [10, 3, 3, 30], [8, 2, 2, 21], [6, 2, 2, 14], [12, 4, 3, 28]]) {
+    const ids = riders(n), hari = rentang('2026-10-26', hariN)
+    const { grid, langgar, kurang } = buatDraf(ids, hari, p, s)
+    for (const id of ids) assert.equal(langsungGanti(urutan(grid, id, hari)), false, `${n} rider ${p}+${s}: ${id} ganti shift tanpa libur`)
+    assert.deepEqual(langgar, [], `${n} rider ${p}+${s}`)
+    assert.deepEqual(kurang, [], `${n} rider ${p}+${s}: kuota tidak terpenuhi`)
+  }
+})
+
+test('batas 6 hari BERTURUT-TURUT (bukan hanya per minggu kalender)', () => {
+  const ids = riders(4), hari = rentang('2026-10-26', 28)
+  const { grid } = buatDraf(ids, hari, 2, 1)
+  for (const id of ids) assert.ok(beruntunMaks(urutan(grid, id, hari)) <= 6, `${id} bekerja lebih dari 6 hari berturut-turut`)
+  // berasal dari periode sebelumnya: sudah 6 hari berturut-turut → hari pertama harus libur
+  const r = buatDraf(riders(3), ['2026-10-26'], 2, 1, { riwayat: { r1: { hk: 6, shiftKemarin: 'pagi', shiftTerakhir: 'pagi', beruntun: 6, pekanBerjalan: 0 } } })
+  assert.equal(r.grid['r1|2026-10-26'], undefined)
+})
+
+test('setelah libur rider melanjutkan shift sebelum libur (ritme tidur terjaga), bukan dipaksa pagi', () => {
+  const awal = (terakhir) => ({ r1: { hk: 0, shiftKemarin: '', shiftTerakhir: terakhir, beruntun: 0, pekanBerjalan: 0 }, r2: { hk: 9, shiftKemarin: '', shiftTerakhir: 'pagi', beruntun: 0, pekanBerjalan: 0 }, r3: { hk: 9, shiftKemarin: '', shiftTerakhir: 'pagi', beruntun: 0, pekanBerjalan: 0 } })
+  assert.equal(buatDraf(riders(3), ['2026-10-26'], 1, 1, { riwayat: awal('siang') }).grid['r1|2026-10-26'], 'siang')
+  assert.equal(buatDraf(riders(3), ['2026-10-26'], 1, 1, { riwayat: awal('pagi') }).grid['r1|2026-10-26'], 'pagi')
+})
+
+test('melanjutkan dari periode sebelumnya: kemarin siang tidak boleh langsung pagi', () => {
+  const riwayat = { r1: { hk: 1, shiftKemarin: 'siang', shiftTerakhir: 'siang', beruntun: 1, pekanBerjalan: 1 } }
+  const { grid, langgar } = buatDraf(riders(3), ['2026-10-27'], 2, 0, { riwayat }) // hanya ada slot pagi
+  assert.equal(grid['r1|2026-10-27'], undefined) // r1 libur dulu
+  assert.equal(grid['r2|2026-10-27'], 'pagi')
+  assert.equal(grid['r3|2026-10-27'], 'pagi')
+  assert.deepEqual(langgar, [])
+})
+
+test('adil lintas minggu walau jadwal dibuat minggu demi minggu: yang minggu lalu lebih banyak kerja, minggu ini lebih sedikit', () => {
+  const ids = riders(5), minggu1 = rentang('2026-10-26', 7), minggu2 = rentang('2026-11-02', 7)
+  const w1 = buatDraf(ids, minggu1, 2, 1).grid
+  const hk1 = ids.map((id) => hitung(w1, id))
+  const w2 = buatDraf(ids, minggu2, 2, 1, { riwayat: hitungRiwayat(barisDari(w1), ids, '2026-11-02') }).grid
+  const hk2 = ids.map((id) => hitung(w2, id))
+  const total = ids.map((_, i) => hk1[i] + hk2[i])
+  assert.ok(Math.max(...total) - Math.min(...total) <= 1, `total 2 minggu tidak merata: ${total}`)
+  const banyak = hk1.indexOf(Math.max(...hk1)), sedikit = hk1.indexOf(Math.min(...hk1))
+  if (hk1[banyak] > hk1[sedikit]) assert.ok(hk2[banyak] <= hk2[sedikit], `minggu 2 harus dibalik: minggu1=${hk1} minggu2=${hk2}`)
+  // pembanding: tanpa riwayat, minggu 2 identik dengan minggu 1 (tidak ada ingatan) — itulah yang diperbaiki
+  assert.deepEqual(buatDraf(ids, minggu2, 2, 1).grid && ids.map((id) => hitung(buatDraf(ids, minggu2, 2, 1).grid, id)), hk1)
+})
+
+test('kuota mustahil dipenuhi tanpa melanggar aturan shift: kuota diutamakan, pelanggaran DILAPORKAN (tidak diam-diam)', () => {
+  // keduanya kemarin pagi; kuota 1 pagi + 1 siang → salah satu terpaksa pindah ke siang tanpa libur
+  const riwayat = { r1: { hk: 3, shiftKemarin: 'pagi', shiftTerakhir: 'pagi', beruntun: 3, pekanBerjalan: 3 }, r2: { hk: 3, shiftKemarin: 'pagi', shiftTerakhir: 'pagi', beruntun: 3, pekanBerjalan: 3 } }
+  const { grid, langgar, kurang } = buatDraf(riders(2), ['2026-10-29'], 1, 1, { riwayat })
+  assert.equal(grid['r1|2026-10-29'], 'pagi')
+  assert.equal(grid['r2|2026-10-29'], 'siang')
+  assert.deepEqual(langgar, [{ tanggal: '2026-10-29', riderId: 'r2' }])
+  assert.deepEqual(kurang, [])
+})
+
+test('hitungRiwayat: hari kerja, shift kemarin/terakhir, berturut-turut, dan minggu berjalan; libur diabaikan', () => {
+  const rows = [
+    { rider_id: 'r1', tanggal: '2026-10-26', shift: 'pagi' }, { rider_id: 'r1', tanggal: '2026-10-27', shift: 'pagi' },
+    { rider_id: 'r1', tanggal: '2026-10-24', shift: 'siang' }, { rider_id: 'r1', tanggal: '2026-10-25', shift: 'off' },
+    { rider_id: 'r2', tanggal: '2026-10-20', shift: 'siang' }, { rider_id: 'r2', tanggal: '2026-10-21', shift: 'siang' },
+  ]
+  const h = hitungRiwayat(rows, ['r1', 'r2', 'r3'], '2026-10-28') // Rabu
+  assert.deepEqual(h.r1, { hk: 3, shiftKemarin: 'pagi', shiftTerakhir: 'pagi', beruntun: 2, pekanBerjalan: 2 })
+  assert.deepEqual(h.r2, { hk: 2, shiftKemarin: '', shiftTerakhir: 'siang', beruntun: 0, pekanBerjalan: 0 })
+  assert.deepEqual(h.r3, { hk: 0, shiftKemarin: '', shiftTerakhir: '', beruntun: 0, pekanBerjalan: 0 })
+})
+
 test('tanpa rider atau kuota 0: draf kosong, tidak error', () => {
   assert.deepEqual(buatDraf([], hari7, 2, 1).grid, {})
   assert.equal(buatDraf([], hari7, 2, 1).kurang.length, 7)
-  assert.deepEqual(buatDraf(riders(3), hari7, 0, 0), { grid: {}, kurang: [] })
+  assert.deepEqual(buatDraf(riders(3), hari7, 0, 0), { grid: {}, kurang: [], langgar: [] })
 })
 
 test('shift cenderung konsisten: rider pagi tetap pagi bila memungkinkan', () => {

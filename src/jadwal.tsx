@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarOff, Copy, FileText, Image as ImageIcon, Sparkles, Sun, Sunrise } from 'lucide-react'
 import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
-import { buatDraf } from './otomatis'
+import { buatDraf, hitungRiwayat } from './otomatis'
 import { Cetak } from './unduh'
 
 const SIKLUS = ['', 'pagi', 'siang'] // urutan ganti saat sel diklik
@@ -129,14 +129,21 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const ubahDari = (tgl: string) => (mode === 'bebas' ? ubahTanggal(tgl, sampai < tgl ? tgl : sampai) : pasang(...periodeDi(mode, tgl, days.length)))
 
   // Draf otomatis: dibagi sesuai kuota DS secara adil. Belum tersimpan sampai Captain klik "Simpan jadwal".
-  const susunOtomatis = () => {
+  const susunOtomatis = async () => {
     if (ds.kuota_pagi + ds.kuota_siang === 0) return toast('Kuota DS masih 0. Minta Super-admin mengisi kuota pagi dan siang di Kelola DS & Captain.')
     if (!riders.rows.length) return toast('Belum ada rider aktif di DS ini.')
     if (adaIsi && !confirm('Jadwal periode ini sudah ada isinya. Ganti dengan draf otomatis?')) return
-    const { grid, kurang } = buatDraf(riders.rows.map((r) => r.id), days, ds.kuota_pagi, ds.kuota_siang)
+    // Ingat 28 hari terakhir yang sudah tersimpan: keadilan hari kerja berlanjut lintas minggu, dan shift
+    // tidak berganti tanpa libur dulu walau melewati batas periode.
+    const { data, error } = await ambilJadwal(ds.id, addDays(dari, -28), addDays(dari, -1))
+    if (error) return toast(error.message)
+    const ids = riders.rows.map((r) => r.id)
+    const { grid, kurang, langgar } = buatDraf(ids, days, ds.kuota_pagi, ds.kuota_siang, { riwayat: hitungRiwayat(data ?? [], ids, dari) })
     setG(grid)
-    toast.ok(`Draf jadwal dibuat (${Object.keys(grid).length} shift). Periksa dulu, lalu klik Simpan jadwal.`)
+    const hk = ids.map((id) => days.filter((d) => grid[`${id}|${d}`]).length)
+    toast.ok(`Draf jadwal dibuat: ${Object.keys(grid).length} shift, hari kerja per rider ${Math.min(...hk)}–${Math.max(...hk)}. Periksa dulu, lalu klik Simpan jadwal.`)
     if (kurang.length) toast(`Rider kurang untuk memenuhi kuota di ${kurang.length} hari (mulai ${hari(kurang[0].tanggal)}). Tambah rider atau kurangi kuota.`)
+    if (langgar.length) toast(`${langgar.length} kali rider terpaksa pindah shift tanpa libur dulu supaya kuota terpenuhi (mulai ${hari(langgar[0].tanggal)}). Periksa lagi jadwalnya.`)
   }
 
   // Salin periode sebelumnya yang panjangnya sama (mis. 14 hari terakhir sebelum periode ini)
@@ -275,7 +282,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         <Pagination {...pg} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {editable && <>Warna pada baris kuota: hijau pas, kuning kurang, merah kelebihan. Jadwal tetap bisa disimpan. "Susun otomatis" membagi shift sesuai kuota secara adil (maksimal 6 hari kerja per minggu, jadi ada minimal 1 hari libur). Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal. Pindah periode sebelum menyimpan akan membuang draf. </>}
+        {editable && <>Warna pada baris kuota: hijau pas, kuning kurang, merah kelebihan. Jadwal tetap bisa disimpan. "Susun otomatis" membagi shift sesuai kuota secara adil dan membaca jadwal 28 hari sebelumnya yang sudah tersimpan (simpan periode sebelumnya dulu). Aturannya: maksimal 6 hari kerja per minggu dan 6 hari berturut-turut, shift hanya berganti setelah libur, dan setelah libur rider melanjutkan shift sebelumnya. Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal. Pindah periode sebelum menyimpan akan membuang draf. </>}
         Gambar dan PDF dibuat langsung di browser dan tidak disimpan di database.
       </p>
       {cetak && (
