@@ -23,6 +23,19 @@ export function Daily({ ds }: { me: Me; ds: Ds | null }) {
   return ds ? <DailyInner ds={ds} /> : <p>Anda belum ditunjuk sebagai Captain di DS mana pun.</p>
 }
 
+// Super-admin (akses penuh): isi atau koreksi absensi di DS mana pun
+export function AbsensiSemua() {
+  const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
+  const [id, setId] = useState('')
+  const ds = dsl.rows.find((d) => d.id === (id || dsl.rows[0]?.id))
+  return (
+    <div>
+      <Select className="mb-3 w-72 max-w-full" value={ds?.id ?? ''} onChange={setId} placeholder="Pilih DS" opsi={dsl.rows.map((d) => ({ value: d.id, label: d.nama }))} />
+      {ds ? <DailyInner key={ds.id} ds={ds} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
+    </div>
+  )
+}
+
 function DailyInner({ ds }: { ds: Ds }) {
   const [tgl, setTgl] = useState(today())
   const [q, setQ] = useState('')

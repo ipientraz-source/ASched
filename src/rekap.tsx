@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
 import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
@@ -24,14 +24,25 @@ const pct = (d: DsRow) => (d.terisi > 0 ? Math.round((100 * d.patuh) / d.terisi)
 const jam = (s: string | null) => (s ? new Date(s).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' }) : 'belum pernah')
 
 function useRange() {
-  const [mode, setMode] = useState<'harian' | 'mingguan' | 'bulanan'>('mingguan')
+  const [mode, setMode] = useState<'harian' | 'mingguan' | 'bulanan' | 'rentang'>('mingguan')
   const [ref, setRef] = useState(today())
+  const [akhir, setAkhir] = useState(today()) // ujung rentang sendiri
   const [from, to] =
-    mode === 'harian' ? [ref, ref] : mode === 'mingguan' ? [monday(ref), addDays(monday(ref), 6)] : [ref.slice(0, 8) + '01', lastOfMonth(ref)]
+    mode === 'harian' ? [ref, ref]
+    : mode === 'mingguan' ? [monday(ref), addDays(monday(ref), 6)]
+    : mode === 'bulanan' ? [ref.slice(0, 8) + '01', lastOfMonth(ref)]
+    : ref <= akhir ? [ref, akhir] : [akhir, ref] // rentang bebas: urutannya dibetulkan otomatis
   const ui = (
     <div className="flex flex-wrap gap-2 items-center mb-3">
-      <Select className="w-52" value={mode} onChange={(v) => setMode(v as typeof mode)} opsi={[{ value: 'harian', label: 'Harian' }, { value: 'mingguan', label: 'Mingguan (Senin–Minggu)' }, { value: 'bulanan', label: 'Bulanan' }]} />
-      <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
+      <Select className="w-52" value={mode} onChange={(v) => setMode(v as typeof mode)} opsi={[{ value: 'harian', label: 'Harian' }, { value: 'mingguan', label: 'Mingguan (Senin–Minggu)' }, { value: 'bulanan', label: 'Bulanan' }, { value: 'rentang', label: 'Rentang sendiri' }]} />
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {mode === 'rentang' ? 'Dari' : 'Tanggal acuan'} <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
+      </label>
+      {mode === 'rentang' && (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          Sampai <input type="date" className="inp" value={akhir} onChange={(e) => e.target.value && setAkhir(e.target.value)} />
+        </label>
+      )}
       <span className="text-sm text-muted-foreground">
         {from} s/d {to}
       </span>
@@ -292,19 +303,22 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
         </table></div>
         <Pagination {...pgD} />
       </div>
-      {dsId ? <Kunci dsId={dsId} /> : luas && <div className="card text-sm text-muted-foreground">Pilih satu DS di atas untuk mengunci absensi mingguannya.</div>}
+      {dsId ? <Kunci dsId={dsId} bisaBuka={me.peran === 'super_admin'} /> : luas && <div className="card text-sm text-muted-foreground">Pilih satu DS di atas untuk mengunci absensi mingguannya.</div>}
     </div>
   )
 }
 
 // Kunci actual per minggu (Senin–Minggu) — setelah dikunci tidak bisa diubah
-function Kunci({ dsId }: { dsId: string }) {
+function Kunci({ dsId, bisaBuka }: { dsId: string; bisaBuka: boolean }) {
   const kunci = useRows<{ minggu_mulai: string }>(() => sb.from('periode_kunci').select('minggu_mulai').eq('ds_id', dsId), [dsId])
   const weeks = Array.from({ length: 6 }, (_, i) => addDays(monday(today()), -7 * (i + 1)))
   return (
     <div className="card">
       <b>Kunci absensi mingguan</b>
-      <p className="text-xs text-muted-foreground mt-0.5">Setelah dikunci, absensi minggu itu tidak bisa diubah lagi supaya hitungan gaji tidak berubah.</p>
+      <p className="text-xs text-muted-foreground mt-0.5">
+        Setelah dikunci, absensi minggu itu tidak bisa diubah supaya hitungan gaji tidak berubah.
+        {bisaBuka ? ' Sebagai Super-admin, Anda bisa membuka kunci kalau perlu koreksi (tercatat di log aktivitas).' : ' Hanya Super-admin yang bisa membuka kunci.'}
+      </p>
       <ul className="mt-2 text-sm space-y-1">
         {weeks.map((w) => {
           const locked = kunci.rows.some((k) => k.minggu_mulai === w)
@@ -312,7 +326,22 @@ function Kunci({ dsId }: { dsId: string }) {
             <li key={w} className="flex items-center gap-2">
               <span>{hari(w)} – {hari(addDays(w, 6))}</span>
               {locked ? (
-                <span className="text-success">🔒 terkunci</span>
+                <>
+                  <span className="text-success">🔒 terkunci</span>
+                  {bisaBuka && (
+                    <button
+                      className="btn2 !px-2.5 !py-1 text-xs"
+                      onClick={async () => {
+                        if (confirm('Buka kunci minggu ini? Absensi bisa diubah lagi dan hitungan gaji bisa ikut berubah. Pembukaan ini tercatat di log.') && (await ok(sb.rpc('buka_kunci', { p_ds: dsId, p_minggu: w })))) {
+                          toast.ok('Kunci dibuka. Jangan lupa kunci lagi setelah koreksi.')
+                          kunci.reload()
+                        }
+                      }}
+                    >
+                      Buka kunci
+                    </button>
+                  )}
+                </>
               ) : (
                 <button
                   className="btn2"
