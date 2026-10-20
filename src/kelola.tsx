@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { sb, useRows, ok, toast, Err, Field, RiderPick, usePage, Pagination, type Ds, type Rider } from './lib'
+import { sb, useRows, ok, toast, konfirmasi, Err, Field, RiderPick, usePage, Pagination, type Ds, type Rider } from './lib'
 
 // Buat / ganti password akun login lewat edge function (service role ada di server, bukan di browser)
 async function buatAkun(email: string, password: string) {
@@ -105,7 +105,7 @@ function DsCard({ d, riders, candidates, kandidatArcon, semuaDs, reload }: { d: 
     reload()
   }
   const lepasArcon = async () => {
-    if (confirm(`Lepas ${arc?.nama} dari ${d.nama}? Beliau tetap memegang DS lain kalau ada.`) && (await ok(sb.rpc('lepas_arcon', { p_ds: d.id })))) {
+    if ((await konfirmasi(`Lepas ${arc?.nama} dari ${d.nama}? Beliau tetap memegang DS lain kalau ada.`, { judul: 'Lepas Arcon dari DS ini?', ya: 'Lepas', bahaya: true })) && (await ok(sb.rpc('lepas_arcon', { p_ds: d.id })))) {
       toast.ok('Arcon dilepas dari DS ini')
       reload()
     }

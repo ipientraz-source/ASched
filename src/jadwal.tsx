@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CalendarOff, ChevronDown, Copy, Download, FileText, Image as ImageIcon, Lock, Sparkles, Sun, Sunrise } from 'lucide-react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, konfirmasi, Err, Select, type Ds, type Me, type Rider } from './lib'
 import { bagiCadangan, buatDraf, cadanganDisarankan, hitungRiwayat, polaAbsen, ringkasanKeadilan, type KuotaHari, type PolaHari, type StatRider } from './otomatis'
 import { Cetak } from './unduh'
 
@@ -306,7 +306,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const susunOtomatis = async () => {
     if (!riders.rows.length) return toast('Belum ada rider aktif di DS ini.')
     if (days.every((d) => kq(d).pagi + kq(d).siang === 0)) return toast('Kebutuhan masih 0 untuk semua hari. Isi kebutuhan di baris kuota, atau minta Super-admin mengisi kuota DS di Kelola DS & Captain.')
-    if (adaIsi && !pertahankan && !confirm('Jadwal periode ini sudah ada isinya. Ganti dengan draf otomatis? (Libur terkunci tetap dihormati.)')) return
+    if (adaIsi && !pertahankan && !(await konfirmasi('Jadwal periode ini sudah ada isinya. Ganti dengan draf otomatis? Sel Off (gembok) tetap dihormati.', { judul: 'Ganti jadwal periode ini?', ya: 'Ganti' }))) return
     // Ingat 28 hari terakhir yang sudah tersimpan: keadilan hari kerja berlanjut lintas minggu, dan shift
     // tidak berganti tanpa libur dulu walau melewati batas periode.
     const { data, error } = await ambilJadwal(ds.id, addDays(dari, -28), addDays(dari, -1))
@@ -346,7 +346,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
     const baru: Record<string, string> = {}
     for (const r of data ?? []) if (aktif.has(r.rider_id)) baru[`${r.rider_id}|${addDays(r.tanggal, n)}`] = r.shift
     if (!Object.keys(baru).length) return toast('Periode sebelumnya belum ada jadwal untuk disalin.')
-    if (adaIsi && !confirm('Jadwal periode ini sudah ada isinya. Ganti dengan salinan periode sebelumnya?')) return
+    if (adaIsi && !(await konfirmasi('Jadwal periode ini sudah ada isinya. Ganti dengan salinan periode sebelumnya?', { judul: 'Ganti jadwal periode ini?', ya: 'Ganti' }))) return
     setG(baru)
     toast.ok('Jadwal periode sebelumnya disalin. Periksa dulu, lalu klik Simpan jadwal.')
   }

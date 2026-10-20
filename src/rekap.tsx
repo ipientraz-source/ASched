@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, konfirmasi, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
 import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
@@ -332,7 +332,7 @@ function Kunci({ dsId, bisaBuka }: { dsId: string; bisaBuka: boolean }) {
                     <button
                       className="btn2 !px-2.5 !py-1 text-xs"
                       onClick={async () => {
-                        if (confirm('Buka kunci minggu ini? Absensi bisa diubah lagi dan hitungan gaji bisa ikut berubah. Pembukaan ini tercatat di log.') && (await ok(sb.rpc('buka_kunci', { p_ds: dsId, p_minggu: w })))) {
+                        if ((await konfirmasi('Absensi bisa diubah lagi dan hitungan gaji bisa ikut berubah. Pembukaan ini tercatat di log.', { judul: 'Buka kunci minggu ini?', ya: 'Buka kunci', bahaya: true })) && (await ok(sb.rpc('buka_kunci', { p_ds: dsId, p_minggu: w })))) {
                           toast.ok('Kunci dibuka. Jangan lupa kunci lagi setelah koreksi.')
                           kunci.reload()
                         }
@@ -346,7 +346,7 @@ function Kunci({ dsId, bisaBuka }: { dsId: string; bisaBuka: boolean }) {
                 <button
                   className="btn2"
                   onClick={async () => {
-                    if (confirm('Kunci absensi minggu ini? Setelah dikunci tidak bisa diubah lagi.') && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
+                    if ((await konfirmasi('Setelah dikunci, absensi tidak bisa diubah lagi.', { judul: 'Kunci absensi minggu ini?', ya: 'Kunci', bahaya: true })) && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
                   }}
                 >
                   Kunci

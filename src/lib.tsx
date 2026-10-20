@@ -64,6 +64,50 @@ let toastId = 0
 const emit = (msg: string, tone: Toast['tone']) => pushToast({ id: ++toastId, msg, tone })
 export const toast = Object.assign((msg: string) => emit(msg, 'err'), { ok: (msg: string) => emit(msg, 'ok') })
 
+// ── dialog konfirmasi bertema (menggantikan confirm bawaan browser) ──
+type Tanya = { msg: string; judul: string; ya: string; bahaya: boolean; selesai: (v: boolean) => void }
+let bukaTanya: (t: Tanya) => void = (t) => t.selesai(false)
+export const konfirmasi = (msg: string, o: { judul?: string; ya?: string; bahaya?: boolean } = {}) =>
+  new Promise<boolean>((selesai) => bukaTanya({ msg, judul: o.judul ?? 'Yakin?', ya: o.ya ?? 'Lanjut', bahaya: !!o.bahaya, selesai }))
+
+function DialogKonfirmasi() {
+  const [t, setT] = useState<Tanya | null>(null)
+  useEffect(() => {
+    bukaTanya = setT
+    return () => {
+      bukaTanya = (x) => x.selesai(false)
+    }
+  }, [])
+  const tutup = (v: boolean) => {
+    t?.selesai(v)
+    setT(null)
+  }
+  useEffect(() => {
+    if (!t) return
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && tutup(false)
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  })
+  if (!t) return null
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4" onClick={() => tutup(false)}>
+      <div role="alertdialog" aria-modal="true" aria-label={t.judul} className="rise w-full max-w-md rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${t.bahaya ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary'}`}><AlertCircle size={18} /></span>
+          <div>
+            <h3 className="text-base font-bold">{t.judul}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{t.msg}</p>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <button className="btn2" autoFocus={t.bahaya} onClick={() => tutup(false)}>Batal</button>
+          <button className={`btn ${t.bahaya ? '!bg-danger !shadow-none' : ''}`} autoFocus={!t.bahaya} onClick={() => tutup(true)}>{t.ya}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Toaster() {
   const [list, setList] = useState<Toast[]>([])
   useEffect(() => {
@@ -76,6 +120,8 @@ export function Toaster() {
     }
   }, [])
   return (
+    <>
+    <DialogKonfirmasi />
     <div className="fixed bottom-4 right-4 z-50 space-y-2 w-96 max-w-[calc(100vw-2rem)]">
       {list.map((t) => (
         <div key={t.id} className={`rise flex items-start gap-3 rounded-xl border bg-card p-3.5 shadow-xl text-sm ${t.tone === 'ok' ? 'border-primary/30' : 'border-danger/30'}`}>
@@ -85,6 +131,7 @@ export function Toaster() {
         </div>
       ))}
     </div>
+    </>
   )
 }
 

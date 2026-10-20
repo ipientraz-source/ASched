@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { UserCheck, UserMinus, Users } from 'lucide-react'
 import { cocokDs, namaDsBaru, ringkasPerRider, type Baris } from './impor'
-import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, usePage, Pagination, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { sb, useRows, ok, toast, konfirmasi, Err, Kosong, Stat, Field, Select, usePage, Pagination, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -309,7 +309,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
               className="btn2 ml-auto"
               disabled={r.ds_id === ds.id}
               onClick={async () => {
-                if (confirm(`Tarik ${r.nama} dari ${r.ds_nama ?? 'belum punya DS'} ke ${ds.nama}?`) && (await ok(sb.rpc('tarik_rider', { p_rider: r.id })))) {
+                if ((await konfirmasi(`Tarik ${r.nama} dari ${r.ds_nama ?? 'belum punya DS'} ke ${ds.nama}?`, { judul: 'Tarik rider ke DS ini?', ya: 'Tarik' })) && (await ok(sb.rpc('tarik_rider', { p_rider: r.id })))) {
                   setRes([])
                   done()
                 }
