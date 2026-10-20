@@ -88,18 +88,36 @@ export function Toaster() {
 }
 
 // Tombol mode terang / gelap (pilihan disimpan di perangkat)
-export function TemaToggle({ className = '' }: { className?: string }) {
+function useTema() {
   const [gelap, setGelap] = useState(() => document.documentElement.classList.contains('dark'))
-  const ubah = () => {
-    const g = !gelap
+  const pilih = (g: boolean) => {
     document.documentElement.classList.toggle('dark', g)
     store.set('tema', g ? 'gelap' : 'terang')
     setGelap(g)
   }
+  return { gelap, pilih }
+}
+
+// Versi ikon (untuk bar gelap yang sempit)
+export function TemaToggle({ className = '' }: { className?: string }) {
+  const { gelap, pilih } = useTema()
   return (
-    <button onClick={ubah} title={gelap ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'} aria-label="Ganti tema" className={`p-2 rounded-md transition-colors hover:bg-foreground/10 ${className}`}>
+    <button onClick={() => pilih(!gelap)} title={gelap ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'} aria-label="Ganti tema" className={`p-2 rounded-md transition-colors hover:bg-foreground/10 ${className}`}>
       {gelap ? <Sun size={16} /> : <Moon size={16} />}
     </button>
+  )
+}
+
+// Versi berlabel: dua pilihan yang jelas terlihat
+export function TemaSwitch() {
+  const { gelap, pilih } = useTema()
+  const item = (aktif: boolean) =>
+    `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${aktif ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`
+  return (
+    <div role="group" aria-label="Pilih tema" className="inline-flex p-0.5 rounded-lg bg-muted border border-border">
+      <button onClick={() => pilih(false)} aria-pressed={!gelap} className={item(!gelap)}><Sun size={14} />Terang</button>
+      <button onClick={() => pilih(true)} aria-pressed={gelap} className={item(gelap)}><Moon size={14} />Gelap</button>
+    </div>
   )
 }
 

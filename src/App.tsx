@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, ShieldCheck, TrendingUp, Users, type LucideIcon } from 'lucide-react'
-import { sb, store, useRows, Err, Logo, TemaToggle, type Ds, type Me } from './lib'
+import { sb, store, useRows, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
 import { RiderApp, JadwalSaya } from './rider'
 import { Daily } from './daily'
 import { JadwalDs, JadwalSemua } from './jadwal'
@@ -101,7 +101,7 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
       </div>
 
       <div className="relative flex items-center justify-center p-6 min-h-screen md:min-h-0">
-        <TemaToggle className="absolute top-4 right-4 text-muted-foreground" />
+        <div className="absolute top-4 right-4"><TemaSwitch /></div>
         <form onSubmit={submit} className="w-full max-w-sm">
           <div className="md:hidden flex items-center gap-3 mb-8">
             <Logo />
@@ -216,7 +216,8 @@ function AdminApp({ email }: { email: string }) {
             <h2 className="text-2xl font-bold">{cur.nama}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">{cur.desc}</p>
           </div>
-          <span className="font-mono text-xs text-muted-foreground bg-muted rounded-full px-3 py-1">{tgl}</span>
+          <span className="hidden lg:inline font-mono text-xs text-muted-foreground bg-muted rounded-full px-3 py-1.5">{tgl}</span>
+          <TemaSwitch />
         </header>
         <main className="px-4 md:px-8 py-6 max-w-6xl">
           {me.peran === 'captain' && <Notif me={me} />}
