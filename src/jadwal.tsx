@@ -10,7 +10,6 @@ const NAMA_HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
 const NAMA_BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const urutanHari = (d: string) => (new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7 // 0 = Senin
 const namaHari = (d: string) => NAMA_HARI[urutanHari(d)]
-const inisial = (n: string) => n.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
 const kerjaShift = (v: string | undefined) => v === 'pagi' || v === 'siang'
 
 // ── periode fleksibel: per minggu, per 2 minggu, per bulan, atau rentang tanggal sendiri ──
@@ -446,13 +445,13 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => {
+            {shown.map((r, i) => {
               const kerja = days.filter((d) => kerjaShift(g[`${r.id}|${d}`])).length
               return (
                 <tr key={r.id} className="group">
                   <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border/60 bg-card px-4 py-2 transition-colors group-hover:bg-primary-soft">
                     <div className="flex items-center gap-3">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{inisial(r.nama)}</span>
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-bold text-muted-foreground">{i + 1}</span>
                       <div className="leading-tight">
                         <div className="font-medium">{r.nama}</div>
                         <div className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</div>
