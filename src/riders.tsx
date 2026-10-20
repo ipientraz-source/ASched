@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { UserCheck, UserMinus, Users } from 'lucide-react'
-import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, usePage, Pagination, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -17,6 +17,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
     (r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()) && (!fds || (fds === '-' ? !r.ds_id : r.ds_id === fds)),
   )
   const aktif = orang.filter((r) => r.status === 'aktif').length
+  const pg = usePage(shown, [q, fds])
 
   const setStatus = async (r: Rider) => {
     if (await ok(sb.from('riders').update({ status: r.status === 'aktif' ? 'nonaktif' : 'aktif' }).eq('id', r.id))) rs.reload()
@@ -49,13 +50,14 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
           <Kosong teks={orang.length ? 'Tidak ada rider yang cocok' : 'Belum ada rider'} hint={orang.length ? 'Ubah kata kunci atau filter DS.' : 'Import CSV di bawah, atau tambah rider satuan.'} />
         </div>
       )}
-      <div className="overflow-x-auto mb-4 rounded-2xl border border-border bg-card shadow-sm">
+      <div className="mb-4 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr><th>Kode MTR</th><th>Nama</th><th>No HP</th><th>DS</th><th>Peran</th><th>Status</th></tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {pg.rows.map((r) => (
               <tr key={r.id}>
                 <td>{r.kode_mtr}</td><td>{r.nama}</td><td>{r.no_hp}</td>
                 <td>
@@ -75,6 +77,8 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
             ))}
           </tbody>
         </table>
+        </div>
+        <Pagination {...pg} />
       </div>
       {sup ? <ImportCsv done={rs.reload} /> : ds && <Tarik ds={ds} done={rs.reload} />}
       {sup && <TambahRider dsl={dsl.rows} done={rs.reload} />}
@@ -222,6 +226,7 @@ function ImportCsv({ done }: { done: () => void }) {
 function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
   const [q, setQ] = useState('')
   const [res, setRes] = useState<{ id: string; nama: string; ds_id: string | null; ds_nama: string | null; status: string }[]>([])
+  const pg = usePage(res, [res])
   const cari = async () => {
     const { data, error } = await sb.rpc('cari_rider', { p_q: q.trim() })
     if (error) return toast(error.message)
@@ -235,7 +240,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
         <button className="btn" disabled={q.trim().length < 2} onClick={cari}>Cari</button>
       </div>
       <ul className="text-sm divide-y">
-        {res.map((r) => (
+        {pg.rows.map((r) => (
           <li key={r.id} className="flex items-center gap-2 py-1">
             <span>{r.nama}</span>
             <span className="text-muted-foreground/70">{r.ds_nama ?? 'belum punya DS'}</span>
@@ -254,6 +259,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
           </li>
         ))}
       </ul>
+      <Pagination {...pg} />
     </div>
   )
 }

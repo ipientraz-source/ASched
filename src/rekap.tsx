@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, Select, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
 import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
@@ -41,6 +41,16 @@ function useRange() {
 }
 
 function DsTable({ rows }: { rows: DsRow[] }) {
+  const pg = usePage(rows)
+  return (
+    <>
+      <DsTabelIsi rows={pg.rows} />
+      <Pagination {...pg} />
+    </>
+  )
+}
+
+function DsTabelIsi({ rows }: { rows: DsRow[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="tbl">
@@ -91,11 +101,11 @@ export function Dashboard() {
     () =>
       sb.from('perpindahan_rider')
         .select('waktu,rider:riders!perpindahan_rider_rider_id_fkey(nama),dari:ds!perpindahan_rider_dari_ds_fkey(nama),ke:ds!perpindahan_rider_ke_ds_fkey(nama),oleh:riders!perpindahan_rider_ditarik_oleh_fkey(nama)')
-        .order('waktu', { ascending: false }).limit(15),
+        .order('waktu', { ascending: false }).limit(10),
     [],
   )
   const log = useRows<Any>(
-    () => sb.from('log_aktivitas').select('waktu,aksi,detail,captain:riders!log_aktivitas_captain_id_fkey(nama)').order('waktu', { ascending: false }).limit(15),
+    () => sb.from('log_aktivitas').select('waktu,aksi,detail,captain:riders!log_aktivitas_captain_id_fkey(nama)').order('waktu', { ascending: false }).limit(10),
     [],
   )
   const kosong = d.rows.filter((x) => x.hari_belum_isi > 0)
@@ -232,6 +242,9 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
     pengganti_untuk_atau_backup: x.backup?.nama ?? '', penjelasan: x.penjelasan ?? '', diinput_oleh: x.oleh?.nama ?? '', jam_input: x.jam_input,
   }))
 
+  const pgR = usePage(rRows, [q, dsId, from, to])
+  const pgD = usePage(det.rows, [from, to, dsId])
+
   return (
     <div>
       {ui}
@@ -245,38 +258,39 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
       </div>
       <Err msg={d.err || r.err || det.err} />
       <div className="card"><DsTable rows={dsRows} /></div>
-      <div className="card overflow-x-auto">
+      <div className="card">
         <b>Rekap per rider</b>
-        <table className="tbl mt-2">
+        <div className="overflow-x-auto"><table className="tbl mt-2">
           <thead>
             <tr><th>Rider</th><th>DS</th><th>Terjadwal</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th></tr>
           </thead>
           <tbody>
-            {rRows.map((x) => (
+            {pgR.rows.map((x) => (
               <tr key={x.rider_id}>
                 <td>{x.nama} <span className="text-muted-foreground/70">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
                 <td className={x.alpha ? 'text-danger font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
+        <Pagination {...pgR} />
       </div>
-      <div className="card overflow-x-auto">
+      <div className="card">
         <b>Detail absensi ({flat.length}{flat.length === 1000 ? '+' : ''} baris)</b>
-        <table className="tbl mt-2">
+        <div className="overflow-x-auto"><table className="tbl mt-2">
           <thead>
             <tr><th>Tanggal</th><th>DS</th><th>Rider</th><th>Status</th><th>Terkait</th><th>Penjelasan</th><th>Diinput</th></tr>
           </thead>
           <tbody>
-            {det.rows.slice(0, 200).map((x: Any, i: number) => (
+            {pgD.rows.map((x: Any, i: number) => (
               <tr key={i}>
                 <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama}</td><td>{x.penjelasan}</td>
                 <td className="text-xs">{x.oleh?.nama} · {jam(x.jam_input)}</td>
               </tr>
             ))}
           </tbody>
-        </table>
-        {det.rows.length > 200 && <p className="text-xs text-muted-foreground mt-1">Menampilkan 200 baris pertama. Unduh CSV untuk melihat semuanya.</p>}
+        </table></div>
+        <Pagination {...pgD} />
       </div>
       {dsId && <Kunci dsId={dsId} />}
     </div>

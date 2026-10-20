@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, Check, CheckCircle2, ChevronDown, Inbox, Moon, Search, Sun, X, type LucideIcon } from 'lucide-react'
+import { AlertCircle, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Inbox, Moon, Search, Sun, X, type LucideIcon } from 'lucide-react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
 
@@ -84,6 +84,41 @@ export function Toaster() {
           <button onClick={() => setList((l) => l.filter((x) => x.id !== t.id))} className="text-muted-foreground/70 hover:text-foreground"><X size={16} /></button>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── paginasi: maksimal 10 baris per halaman ──
+export const PER_HALAMAN = 10
+export function usePage<T>(rows: T[], resetKey: unknown[] = []) {
+  const [hal, setHal] = useState(1)
+  const total = Math.max(1, Math.ceil(rows.length / PER_HALAMAN))
+  const aktif = Math.min(hal, total)
+  // kembali ke halaman 1 saat pencarian / filter berubah
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setHal(1), resetKey)
+  return { rows: rows.slice((aktif - 1) * PER_HALAMAN, aktif * PER_HALAMAN), hal: aktif, total, jumlah: rows.length, setHal }
+}
+
+export function Pagination({ hal, total, jumlah, setHal }: { hal: number; total: number; jumlah: number; setHal: (n: number) => void }) {
+  if (jumlah <= PER_HALAMAN) return null
+  const dari = (hal - 1) * PER_HALAMAN + 1
+  const sampai = Math.min(hal * PER_HALAMAN, jumlah)
+  const awal = Math.max(1, Math.min(hal - 2, total - 4))
+  const nomor = Array.from({ length: Math.min(5, total) }, (_, i) => awal + i)
+  const btn = 'size-8 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 border-t border-border text-sm text-muted-foreground">
+      <span>
+        Menampilkan <b className="text-foreground">{dari}–{sampai}</b> dari <b className="text-foreground">{jumlah}</b>
+      </span>
+      <div className="flex items-center gap-1" role="navigation" aria-label="Halaman">
+        <button className={`${btn} hover:bg-muted`} disabled={hal <= 1} onClick={() => setHal(hal - 1)} aria-label="Halaman sebelumnya"><ChevronLeft size={16} className="mx-auto" /></button>
+        {nomor.map((n) => (
+          <button key={n} onClick={() => setHal(n)} aria-current={n === hal ? 'page' : undefined} className={`${btn} ${n === hal ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>{n}</button>
+        ))}
+        <button className={`${btn} hover:bg-muted`} disabled={hal >= total} onClick={() => setHal(hal + 1)} aria-label="Halaman berikutnya"><ChevronRight size={16} className="mx-auto" /></button>
+      </div>
     </div>
   )
 }

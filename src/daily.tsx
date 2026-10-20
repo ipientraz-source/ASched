@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 
 type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null }
 type Catat = (rider: string, status: string, backup?: string, teks?: string) => Promise<boolean>
@@ -45,6 +45,7 @@ function DailyInner({ ds }: { ds: Ds }) {
   const shown = listed.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
   const terjadwal = riders.rows.filter((r) => shift(r.id))
   const terisi = terjadwal.filter((r) => act(r.id)).length
+  const pg = usePage(shown, [q, tgl])
 
   const catat: Catat = async (rider, status, backup, teks) => {
     const done = await ok(
@@ -73,7 +74,7 @@ function DailyInner({ ds }: { ds: Ds }) {
       {locked && <p className="bg-warning-soft border border-warning/40 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
       <Err msg={riders.err || jd.err || ac.err} />
       <div className="space-y-2">
-        {shown.map((r) => (
+        {pg.rows.map((r) => (
           <Baris
             key={r.id + tgl}
             r={r}
@@ -88,6 +89,7 @@ function DailyInner({ ds }: { ds: Ds }) {
         ))}
         {!shown.length && <div className="card"><Kosong teks="Tidak ada rider yang dijadwalkan di tanggal ini" hint="Susun jadwal di tab Jadwal DS Saya, atau tambahkan rider pengganti di bawah." /></div>}
       </div>
+      <div className="mt-3"><Pagination {...pg} /></div>
       <TambahPengganti
         kandidat={riders.rows.filter((r) => !listed.some((l) => l.id === r.id))}
         terjadwal={terjadwal}

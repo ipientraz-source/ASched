@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { sb, useRows, ok, toast, Err, Field, RiderPick, type Ds, type Rider } from './lib'
+import { sb, useRows, ok, toast, Err, Field, RiderPick, usePage, Pagination, type Ds, type Rider } from './lib'
 
 // Buat / ganti password akun login lewat edge function (service role ada di server, bukan di browser)
 async function buatAkun(email: string, password: string) {
@@ -25,6 +25,7 @@ export function Kelola() {
   const [cari, setCari] = useState('')
   const candidates = rs.rows.filter((r) => r.peran !== 'super_admin' && r.status === 'aktif')
   const tampil = dsl.rows.filter((d) => (d.nama + (rs.rows.find((r) => r.id === d.captain_id)?.nama ?? '')).toLowerCase().includes(cari.toLowerCase()))
+  const pg = usePage(tampil, [cari])
 
   return (
     <div>
@@ -74,10 +75,12 @@ export function Kelola() {
         <input className="inp w-72 max-w-full" placeholder="Cari DS atau nama Captain…" value={cari} onChange={(e) => setCari(e.target.value)} />
         <span className="text-sm text-muted-foreground">{tampil.length} DS</span>
       </div>
-      {tampil.map((d) => (
+      {pg.rows.map((d) => (
         <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} reload={() => { dsl.reload(); rs.reload() }} />
       ))}
       {!tampil.length && <div className="card text-center text-muted-foreground text-sm">{dsl.rows.length ? 'Tidak ada DS yang cocok dengan pencarian.' : 'Belum ada DS. Buat yang pertama di atas.'}</div>}
+
+      <div className="mb-4"><Pagination {...pg} /></div>
 
       <SuperAdmins admins={rs.rows.filter((r) => r.peran === 'super_admin')} reload={rs.reload} />
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Copy, Sparkles } from 'lucide-react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 import { buatDraf } from './otomatis'
 
 const SIKLUS = ['', 'pagi', 'siang'] // urutan ganti saat sel diklik
@@ -22,6 +22,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
 
   const cnt = (d: string, s: string) => riders.rows.filter((r) => g[`${r.id}|${d}`] === s).length
   const shown = riders.rows.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
+  const pg = usePage(shown, [q, ds.id, start])
 
   const adaIsi = days.some((d) => riders.rows.some((r) => g[`${r.id}|${d}`]))
 
@@ -79,7 +80,8 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         )}
       </div>
       <Err msg={riders.err || j.err} />
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr>
@@ -90,7 +92,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {pg.rows.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">
                   {r.nama} <span className="text-muted-foreground/70">{r.kode_mtr}</span>
@@ -137,6 +139,8 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             </tr>
           </tbody>
         </table>
+        </div>
+        <Pagination {...pg} />
       </div>
       {editable && <p className="text-xs text-muted-foreground mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan. "Susun otomatis" membagi shift sesuai kuota secara adil (maksimal 6 hari kerja per rider, jadi ada minimal 1 hari libur). Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal.</p>}
     </div>
