@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarOff, Copy, FileText, Image as ImageIcon, Lock, Sparkles, Sun, Sunrise } from 'lucide-react'
+import { CalendarOff, ChevronDown, Copy, Download, FileText, Image as ImageIcon, Lock, Sparkles, Sun, Sunrise } from 'lucide-react'
 import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, type Ds, type Me, type Rider } from './lib'
 import { bagiCadangan, buatDraf, cadanganDisarankan, hitungRiwayat, polaAbsen, ringkasanKeadilan, type KuotaHari, type PolaHari, type StatRider } from './otomatis'
 import { Cetak } from './unduh'
@@ -119,6 +119,46 @@ function SelKuota({ nP, nS, k, editable, ringkas, ubah }: { nP: number; nS: numb
       <div className={`${baris} font-mono text-[11px] font-semibold ${wP}`}><span>P{nP}</span>{input('pagi', k.pagi, 'Kebutuhan shift pagi hari ini (sesuai permintaan client)')}</div>
       <div className={`${baris} font-mono text-[11px] font-semibold ${wS}`}><span>S{nS}</span>{input('siang', k.siang, 'Kebutuhan shift siang hari ini (sesuai permintaan client)')}</div>
       <div className={`${baris} font-mono text-[10px] text-muted-foreground`}><span>cad</span>{input('cadangan', k.cadangan, 'Rider cadangan di atas kebutuhan client (opsional)')}</div>
+    </div>
+  )
+}
+
+// Dropdown "Unduh": gambar atau PDF (dibuat di browser, tidak disimpan di database)
+function MenuUnduh({ sibuk, kosong, pilih }: { sibuk: string | null; kosong: boolean; pilih: (m: 'png' | 'pdf') => void }) {
+  const [buka, setBuka] = useState(false)
+  const item = (m: 'png' | 'pdf', ikon: React.ReactNode, label: string) => (
+    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setBuka(false); pilih(m) }}>{ikon}{label}</button>
+  )
+  return (
+    <div className="relative">
+      <button className="btn2" disabled={!!sibuk || kosong} onClick={() => setBuka(!buka)} aria-haspopup="menu" aria-expanded={buka}>
+        <Download size={14} />{sibuk ? 'Membuat…' : 'Unduh'}<ChevronDown size={14} />
+      </button>
+      {buka && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setBuka(false)} />
+          <div role="menu" className="absolute left-0 top-full z-30 mt-1 w-44 rounded-xl border border-border bg-card p-1 shadow-lg">
+            {item('png', <ImageIcon size={14} />, 'Gambar (PNG)')}
+            {item('pdf', <FileText size={14} />, 'PDF')}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Satu langkah di panel atas: nomor, judul + penjelasan di kiri, kontrol di kanan
+function Langkah({ no, judul, ket, children }: { no: number; judul: string; ket: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
+      <div className="flex items-start gap-3 md:w-64 md:shrink-0">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{no}</span>
+        <div>
+          <div className="text-sm font-semibold leading-6">{judul}</div>
+          <div className="text-xs text-muted-foreground">{ket}</div>
+        </div>
+      </div>
+      <div className="flex flex-1 flex-wrap items-center gap-2">{children}</div>
     </div>
   )
 }
@@ -328,47 +368,55 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
     }
   }
 
+  const unduh = <MenuUnduh sibuk={cetak} kosong={!riders.rows.length} pilih={setCetak} />
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Select className="w-44" value={mode} onChange={gantiMode} opsi={[{ value: 'minggu', label: 'Per minggu' }, { value: 'dua', label: 'Per 2 minggu' }, { value: 'bulan', label: 'Per bulan' }, { value: 'bebas', label: 'Rentang sendiri' }]} />
-        <button className="btn2" onClick={() => pasang(...periodeDi(mode, today(), days.length))}>Hari ini</button>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Dari <input type="date" className="inp" value={dari} onChange={(e) => e.target.value && ubahDari(e.target.value)} />
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Sampai <input type="date" className="inp" value={sampai} min={dari} onChange={(e) => e.target.value && ubahTanggal(dari, e.target.value)} />
-        </label>
-        <span className="text-xs text-muted-foreground">{days.length} hari</span>
+      <div className="mb-4 divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
+        <Langkah no={1} judul="Pilih periode" ket="Rentang tanggal yang mau dijadwalkan.">
+          <Select className="w-44" value={mode} onChange={gantiMode} opsi={[{ value: 'minggu', label: 'Per minggu' }, { value: 'dua', label: 'Per 2 minggu' }, { value: 'bulan', label: 'Per bulan' }, { value: 'bebas', label: 'Rentang sendiri' }]} />
+          <button className="btn2" onClick={() => pasang(...periodeDi(mode, today(), days.length))}>Hari ini</button>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Dari <input type="date" className="inp" value={dari} onChange={(e) => e.target.value && ubahDari(e.target.value)} />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Sampai <input type="date" className="inp" value={sampai} min={dari} onChange={(e) => e.target.value && ubahTanggal(dari, e.target.value)} />
+          </label>
+          <span className="text-xs text-muted-foreground">{days.length} hari</span>
+        </Langkah>
+        {editable && (
+          <Langkah no={2} judul="Isi jadwal" ket="Susun otomatis, lalu rapikan manual dengan klik sel di tabel.">
+            <button className="btn2" onClick={susunOtomatis}><Sparkles size={14} />Susun otomatis</button>
+            <button className="btn2" onClick={salinSebelumnya}><Copy size={14} />Salin periode sebelumnya</button>
+            <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Opsi susun otomatis:</span>
+              <label className="flex cursor-pointer items-center gap-1.5" title="Pagi/siang yang sudah Anda isi tidak diubah; otomatis hanya mengisi sisanya. Libur terkunci (gembok) selalu dihormati, dicentang atau tidak.">
+                <input type="checkbox" checked={pertahankan} onChange={(e) => setPertahankan(e.target.checked)} /> Pertahankan shift yang sudah diisi
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5" title="Menambah rider di atas kebutuhan client pada hari yang sering ada absen, berdasarkan pola 8 minggu terakhir.">
+                <input type="checkbox" checked={pakaiCadangan} onChange={(e) => setPakaiCadangan(e.target.checked)} /> Tambah cadangan sesuai pola absen
+              </label>
+            </div>
+          </Langkah>
+        )}
+        {editable && (
+          <Langkah no={3} judul="Simpan" ket="Jadwal baru berlaku setelah disimpan.">
+            <button className="btn" onClick={save}>Simpan jadwal</button>
+            {unduh}
+          </Langkah>
+        )}
+        {!editable && (
+          <Langkah no={2} judul="Unduh" ket="Dibuat di browser, tidak disimpan di database.">
+            {unduh}
+          </Langkah>
+        )}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input className="inp w-56" placeholder="Cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">
-          <Pil v="pagi" /> <Pil v="siang" /> <Pil v="off" /> <Pil v="" /> <span>libur</span>
-        </div>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <button className="btn2" disabled={!!cetak || !riders.rows.length} onClick={() => setCetak('png')} title="Unduh jadwal periode ini sebagai gambar"><ImageIcon size={14} />{cetak === 'png' ? 'Membuat…' : 'Unduh gambar'}</button>
-          <button className="btn2" disabled={!!cetak || !riders.rows.length} onClick={() => setCetak('pdf')} title="Unduh jadwal periode ini sebagai PDF"><FileText size={14} />{cetak === 'pdf' ? 'Membuat…' : 'Unduh PDF'}</button>
-          {editable && (
-            <>
-              <button className="btn2" onClick={salinSebelumnya}><Copy size={14} />Salin periode sebelumnya</button>
-              <button className="btn2" onClick={susunOtomatis}><Sparkles size={14} />Susun otomatis</button>
-              <button className="btn" onClick={save}>Simpan jadwal</button>
-            </>
-          )}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">Keterangan:</span> <Pil v="pagi" /> <Pil v="siang" /> <Pil v="off" /> <Pil v="" /> <span>libur</span>
         </div>
       </div>
-      {editable && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">Opsi Susun otomatis:</span>
-          <label className="flex cursor-pointer items-center gap-1.5" title="Pagi/siang yang sudah Anda isi tidak diubah; otomatis hanya mengisi sisanya. Libur terkunci (gembok) selalu dihormati, dicentang atau tidak.">
-            <input type="checkbox" checked={pertahankan} onChange={(e) => setPertahankan(e.target.checked)} /> Pertahankan shift yang sudah diisi
-          </label>
-          <label className="flex cursor-pointer items-center gap-1.5" title="Menambah rider di atas kebutuhan client pada hari yang sering ada absen, berdasarkan pola 8 minggu terakhir.">
-            <input type="checkbox" checked={pakaiCadangan} onChange={(e) => setPakaiCadangan(e.target.checked)} /> Tambah cadangan sesuai pola absen
-          </label>
-        </div>
-      )}
       <Err msg={riders.err || j.err || kRows.err} />
       {!editable && !j.rows.length && riders.rows.length > 0 && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
