@@ -27,13 +27,15 @@
 /* ── 2. SEMANTIC: makna/tujuan — inilah yang dipakai komponen. Mode gelap cukup menimpa lapis ini. ── */
 :root {
   color-scheme: light;
-  --background: var(--gray-50);
+  --background: #ececef;
   --foreground: var(--gray-950);
   --card: var(--gray-0);
   --muted: var(--gray-100);
   --muted-foreground: var(--gray-500);
-  --border: var(--gray-200);
-  --input: var(--gray-300);
+  --border: #dcdce2;
+  --input: #cfcfd6;
+  --edge: #cfcfd6; /* tepi bawah 3D kartu & tombol netral */
+  --edge-primary: var(--purple-800);
   --ring: var(--purple-500);
 
   --primary: var(--purple-600);
@@ -54,13 +56,15 @@
 
 .dark {
   color-scheme: dark;
-  --background: #0a0a0d;
+  --background: #0d0d10;
   --foreground: #f4f4f5;
   --card: #131318;
   --muted: #1c1c23;
   --muted-foreground: var(--gray-400);
   --border: #2a2a33;
   --input: #3a3a45;
+  --edge: #060608;
+  --edge-primary: var(--purple-900);
   --ring: var(--purple-500);
 
   --primary: var(--purple-600);      /* tetap sama: teks putih di atasnya kontras 5.7:1 */
@@ -101,8 +105,8 @@
 
 /* ── 3. COMPONENT: token khusus komponen, merujuk semantic ── */
 :root {
-  --card-radius: 1rem;
-  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  --card-radius: 0.875rem;
+  --card-shadow: 0 3px 0 var(--edge), 0 10px 18px -6px rgb(0 0 0 / 0.08);
   --card-shadow-hover: 0 8px 24px -8px rgb(0 0 0 / 0.18);
   --control-radius: var(--radius-base);
   --ring-width: 3px;
@@ -153,8 +157,10 @@ h1, h2, h3 { font-family: var(--font-display); }
 
 /* Komponen — state: default / hover / active / focus-visible / disabled */
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:ring-[length:var(--ring-width)] focus-visible:ring-ring/40 disabled:opacity-40 disabled:cursor-not-allowed; border-radius: var(--control-radius); }
-  .btn2 { @apply inline-flex items-center justify-center gap-1.5 border border-input bg-card text-foreground px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:border-foreground/40 active:bg-border focus-visible:outline-none focus-visible:ring-[length:var(--ring-width)] focus-visible:ring-ring/40 disabled:opacity-40 disabled:cursor-not-allowed; border-radius: var(--control-radius); }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:ring-[length:var(--ring-width)] focus-visible:ring-ring/40 disabled:opacity-40 disabled:cursor-not-allowed; border-radius: var(--control-radius); box-shadow: 0 2px 0 var(--edge-primary); }
+  .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 var(--edge-primary); }
+  .btn2 { @apply inline-flex items-center justify-center gap-1.5 border border-input bg-card text-foreground px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:border-foreground/40 active:bg-border focus-visible:outline-none focus-visible:ring-[length:var(--ring-width)] focus-visible:ring-ring/40 disabled:opacity-40 disabled:cursor-not-allowed; border-radius: var(--control-radius); box-shadow: 0 2px 0 var(--edge); }
+  .btn2:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 var(--edge); }
   .btn-lg { @apply min-h-11 px-5 text-base; }
   .inp { @apply border border-input bg-card text-foreground px-2.5 py-1.5 text-sm placeholder:text-muted-foreground/70 transition-colors focus:outline-none focus:border-primary focus:ring-[length:var(--ring-width)] focus:ring-ring/25 disabled:opacity-50; border-radius: var(--control-radius); }
   .card { @apply bg-card border border-border p-5 mb-4; border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
