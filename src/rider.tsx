@@ -1,18 +1,22 @@
-import { sb, today, hari, useRows, Err, type Me } from './lib'
+import { sb, today, hari, useRows, Err, Kosong, Logo, TemaToggle, type Me } from './lib'
 
 const SHIFT: Record<string, string> = { pagi: 'Pagi', siang: 'Siang', off: 'Libur' }
 
 function List({ rows }: { rows: { tanggal: string; shift: string; ds?: string | null }[] }) {
-  if (!rows.length) return <p className="text-slate-500">Belum ada jadwal ke depan.</p>
+  if (!rows.length) return <Kosong teks="Belum ada jadwal" hint="Jadwal akan muncul di sini setelah Captain menyusunnya." />
   return (
-    <ul className="divide-y bg-white rounded border border-slate-200">
+    <ul className="space-y-2">
       {rows.map((r) => (
-        <li key={r.tanggal} className="flex justify-between px-3 py-2">
-          <span>{hari(r.tanggal)}</span>
-          <span className="font-medium">
-            {SHIFT[r.shift] ?? r.shift}
-            {r.ds ? ` · ${r.ds}` : ''}
-          </span>
+        <li key={r.tanggal} className="card !mb-0 !p-3 flex items-center gap-4">
+          <div className="size-12 rounded-lg bg-primary-soft text-primary-soft-foreground flex flex-col items-center justify-center leading-none">
+            <span className="font-mono text-lg font-bold">{r.tanggal.slice(8)}</span>
+            <span className="text-[10px] uppercase font-semibold mt-0.5">{hari(r.tanggal).split(',')[0]}</span>
+          </div>
+          <div className="flex-1">
+            <div className="font-semibold">{SHIFT[r.shift] ?? r.shift}</div>
+            {r.ds && <div className="text-xs text-muted-foreground">{r.ds}</div>}
+          </div>
+          <span className={`badge ${r.shift === 'pagi' ? 'bg-warning-soft text-warning' : r.shift === 'siang' ? 'bg-primary text-white' : 'bg-border text-muted-foreground'}`}>{SHIFT[r.shift]}</span>
         </li>
       ))}
     </ul>
@@ -26,15 +30,22 @@ export function RiderApp({ kode, out }: { kode: string; out: () => void }) {
     [kode],
   )
   return (
-    <div className="max-w-md mx-auto p-4">
-      <div className="flex justify-between items-center mb-3">
-        <h1 className="font-semibold">{rows[0]?.nama ?? 'Jadwal Saya'}</h1>
-        <button className="btn2" onClick={out}>
-          Keluar
-        </button>
+    <div className="min-h-screen">
+      <div className="bg-sidebar text-white px-4 pt-5 pb-8">
+        <div className="max-w-md mx-auto flex items-center gap-3">
+          <Logo small />
+          <div className="flex-1 leading-tight min-w-0">
+            <div className="font-display font-bold truncate">{rows[0]?.nama ?? 'Jadwal Saya'}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-sidebar-foreground">Rider · {kode}</div>
+          </div>
+          <TemaToggle className="text-white hover:!bg-white/10" />
+          <button className="btn2 !bg-transparent !text-white !border-white/30 hover:!border-white" onClick={out}>Keluar</button>
+        </div>
       </div>
-      <Err msg={err} />
-      <List rows={rows.filter((r) => r.tanggal).map((r) => ({ tanggal: r.tanggal!, shift: r.shift, ds: r.ds_nama }))} />
+      <div className="max-w-md mx-auto px-4 -mt-4 pb-10">
+        <Err msg={err} />
+        <List rows={rows.filter((r) => r.tanggal).map((r) => ({ tanggal: r.tanggal!, shift: r.shift, ds: r.ds_nama }))} />
+      </div>
     </div>
   )
 }

@@ -1,26 +1,26 @@
 import { useState } from 'react'
-import { sb, today, monday, hari, useRows, ok, Err, RiderPick, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 
 type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null }
 type Catat = (rider: string, status: string, backup?: string, teks?: string) => Promise<boolean>
 
 const ALASAN: [string, string][] = [
-  ['alpha', 'Tidak hadir dadakan / Alpha'],
+  ['alpha', 'Tidak hadir tanpa kabar (Alpha)'],
   ['izin', 'Izin'],
   ['sakit', 'Sakit'],
-  ['tukar', 'Tukar terencana'],
+  ['tukar', 'Tukar shift (sudah direncanakan)'],
 ]
-const WARNA: Record<string, string> = {
-  hadir: 'bg-green-100 text-green-800',
-  alpha: 'bg-red-100 text-red-800',
-  izin: 'bg-amber-100 text-amber-800',
-  sakit: 'bg-amber-100 text-amber-800',
-  tukar: 'bg-blue-100 text-blue-800',
-  pengganti: 'bg-purple-100 text-purple-800',
+export const WARNA: Record<string, string> = {
+  hadir: 'bg-foreground text-background',
+  alpha: 'bg-danger-soft text-danger',
+  izin: 'bg-border text-foreground/80',
+  sakit: 'bg-border text-foreground/80',
+  tukar: 'bg-primary-soft text-primary-soft-foreground',
+  pengganti: 'bg-primary text-white',
 }
 
 export function Daily({ ds }: { me: Me; ds: Ds | null }) {
-  return ds ? <DailyInner ds={ds} /> : <p>Anda belum ditunjuk sebagai Captain DS manapun.</p>
+  return ds ? <DailyInner ds={ds} /> : <p>Anda belum ditunjuk sebagai Captain di DS mana pun.</p>
 }
 
 function DailyInner({ ds }: { ds: Ds }) {
@@ -45,6 +45,7 @@ function DailyInner({ ds }: { ds: Ds }) {
   const shown = listed.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
   const terjadwal = riders.rows.filter((r) => shift(r.id))
   const terisi = terjadwal.filter((r) => act(r.id)).length
+  const pg = usePage(shown, [q, tgl])
 
   const catat: Catat = async (rider, status, backup, teks) => {
     const done = await ok(
@@ -62,15 +63,18 @@ function DailyInner({ ds }: { ds: Ds }) {
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <input type="date" className="inp" value={tgl} max={today()} onChange={(e) => e.target.value && setTgl(e.target.value)} />
         <b>{hari(tgl)}</b>
-        <span className="text-sm text-slate-600">
-          Terisi {terisi}/{terjadwal.length} terjadwal
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="w-28 h-2 rounded-full bg-border overflow-hidden">
+            <span className="block h-full bg-primary" style={{ width: terjadwal.length ? `${(100 * terisi) / terjadwal.length}%` : '0%' }} />
+          </span>
+          <span className="font-mono">{terisi}/{terjadwal.length}</span> rider sudah diabsen
         </span>
         <input className="inp ml-auto" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {locked && <p className="bg-amber-50 border border-amber-300 rounded p-2 text-sm mb-3">Periode minggu ini sudah dikunci — actual tidak bisa diubah.</p>}
+      {locked && <p className="bg-warning-soft border border-warning/40 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
       <Err msg={riders.err || jd.err || ac.err} />
       <div className="space-y-2">
-        {shown.map((r) => (
+        {pg.rows.map((r) => (
           <Baris
             key={r.id + tgl}
             r={r}
@@ -83,8 +87,9 @@ function DailyInner({ ds }: { ds: Ds }) {
             hapus={hapus}
           />
         ))}
-        {!shown.length && <p className="text-slate-500">Tidak ada rider terjadwal pada tanggal ini.</p>}
+        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider yang dijadwalkan di tanggal ini" hint="Susun jadwal di tab Jadwal DS Saya, atau tambahkan rider pengganti di bawah." /></div>}
       </div>
+      <div className="mt-3"><Pagination {...pg} /></div>
       <TambahPengganti
         kandidat={riders.rows.filter((r) => !listed.some((l) => l.id === r.id))}
         terjadwal={terjadwal}
@@ -113,7 +118,7 @@ function Baris({
   const [teks, setTeks] = useState('')
 
   const simpan = async () => {
-    if (alasan === 'tukar' && !backup) return alert('Pilih rekan yang bertukar')
+    if (alasan === 'tukar' && !backup) return toast('Pilih rekan yang bertukar')
     if (await catat(r.id, alasan, alasan === 'alpha' || alasan === 'tukar' ? backup : undefined, teks)) setBuka(false)
   }
 
@@ -121,44 +126,38 @@ function Baris({
     <div className="card !mb-0">
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-40">
-          <b>{r.nama}</b> <span className="text-slate-400 text-xs">{r.kode_mtr}</span>
-          <div className="text-xs text-slate-500 capitalize">{shift ?? 'tidak dijadwalkan'}</div>
+          <b>{r.nama}</b> <span className="text-muted-foreground/70 text-xs">{r.kode_mtr}</span>
+          <div className="text-xs text-muted-foreground capitalize">{shift ?? 'tidak ada di jadwal'}</div>
         </div>
         {act && (
-          <span className={`text-xs px-2 py-0.5 rounded ${WARNA[act.status]}`}>
+          <span className={`badge ${WARNA[act.status]}`}>
             {act.status}
             {act.status === 'pengganti' && act.backup_untuk_id ? ` untuk ${nama(act.backup_untuk_id)}` : ''}
           </span>
         )}
-        {act?.penjelasan && <span className="text-xs text-slate-500">“{act.penjelasan}”</span>}
+        {act?.penjelasan && <span className="text-xs text-muted-foreground">“{act.penjelasan}”</span>}
         <div className="ml-auto flex gap-2">
-          <button className="btn" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
+          <button className="btn btn-lg" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
             Hadir
           </button>
-          <button className="btn2" disabled={locked} onClick={() => setBuka(!buka)}>
-            Tidak
+          <button className="btn2 btn-lg" disabled={locked} onClick={() => setBuka(!buka)}>
+            Tidak hadir
           </button>
           {act && (
-            <button className="btn2" disabled={locked} onClick={() => hapus(r.id)} title="Kembali ke belum diisi">
-              Reset
+            <button className="btn2" disabled={locked} onClick={() => hapus(r.id)} title="Hapus isian, kembali ke belum diabsen">
+              Batalkan
             </button>
           )}
         </div>
       </div>
       {buka && (
         <div className="mt-2 pt-2 border-t flex flex-wrap gap-2 items-center">
-          <select className="inp" value={alasan} onChange={(e) => setAlasan(e.target.value)}>
-            {ALASAN.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
+          <Select className="w-72 max-w-full" value={alasan} onChange={setAlasan} opsi={ALASAN.map(([value, label]) => ({ value, label }))} />
           {(alasan === 'alpha' || alasan === 'tukar') && (
-            <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Backup (opsional)'} />
+            <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Pengganti / backup (opsional)'} />
           )}
           {alasan !== 'tukar' && (
-            <input className="inp flex-1 min-w-40" placeholder={alasan === 'sakit' ? 'Penjelasan (opsional)' : 'Penjelasan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
+            <input className="inp flex-1 min-w-40" placeholder={alasan === 'sakit' ? 'Keterangan (opsional)' : 'Keterangan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
           )}
           <button className="btn" onClick={simpan}>
             Simpan
@@ -175,9 +174,10 @@ function TambahPengganti({ kandidat, terjadwal, locked, catat }: { kandidat: Rid
   return (
     <div className="card mt-4">
       <b className="block mb-2">Tambah rider pengganti</b>
+      <p className="text-xs text-muted-foreground mb-3 -mt-1">Untuk rider yang masuk kerja padahal tidak ada di jadwal hari itu.</p>
       <div className="flex flex-wrap gap-2 items-center">
         <RiderPick riders={kandidat} value={rid} onChange={setRid} placeholder="Rider pengganti" />
-        <RiderPick riders={terjadwal} value={gt} onChange={setGt} placeholder="Menggantikan (opsional)" />
+        <RiderPick riders={terjadwal} value={gt} onChange={setGt} placeholder="Menggantikan siapa? (opsional)" />
         <button
           className="btn"
           disabled={!rid || locked}

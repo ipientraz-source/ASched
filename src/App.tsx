@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { sb, store, useRows, Err, type Ds, type Me } from './lib'
+import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, ShieldCheck, TrendingUp, Users, type LucideIcon } from 'lucide-react'
+import { sb, store, useRows, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
 import { RiderApp, JadwalSaya } from './rider'
 import { Daily } from './daily'
 import { JadwalDs, JadwalSemua } from './jadwal'
@@ -8,24 +9,31 @@ import { Dashboard, Rekap } from './rekap'
 import { DataRider } from './riders'
 import { Kelola } from './kelola'
 
-type P = { me: Me; ds: Ds | null }
-type Tab = [string, (p: P) => ReactElement]
+type P = { me: Me; ds: Ds | null; dsList: Ds[] } // ds = DS Captain; dsList = semua DS yang dipegang Arcon
+type Tab = { nama: string; desc: string; Icon: LucideIcon; View: (p: P) => ReactElement }
 
 const SUPER: Tab[] = [
-  ['Dashboard', () => <Dashboard />],
-  ['Data Rider', DataRider],
-  ['Jadwal', () => <JadwalSemua />],
-  ['Laporan Actual', Rekap],
-  ['Kelola DS & Captain', () => <Kelola />],
+  { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di semua DS', Icon: LayoutDashboard, View: () => <Dashboard /> },
+  { nama: 'Data Rider', desc: 'Atur rider: pindahkan ke DS lain, ubah status aktif/nonaktif, import dan unduh CSV', Icon: Users, View: DataRider },
+  { nama: 'Jadwal', desc: 'Lihat jadwal semua DS. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: () => <JadwalSemua /> },
+  { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
+  { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota rider, pilih Captain, dan tambah Super-admin', Icon: Building2, View: () => <Kelola /> },
 ]
 const CAPTAIN: Tab[] = [
-  ['Jadwal Saya', JadwalSaya],
-  ['Daily Report', Daily],
-  ['Jadwal DS Saya', JadwalDs],
-  ['Rekap DS Saya', Rekap],
-  ['Rider DS Saya', DataRider],
+  { nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda sebagai rider', Icon: CalendarCheck, View: JadwalSaya },
+  { nama: 'Absensi Harian', desc: 'Tandai rider yang masuk dan tidak masuk hari ini', Icon: ClipboardCheck, View: Daily },
+  { nama: 'Jadwal DS Saya', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
+  { nama: 'Rekap DS Saya', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
+  { nama: 'Rider DS Saya', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
 ]
-const RIDER: Tab[] = [['Jadwal Saya', JadwalSaya]]
+// Arcon: atasan Captain, memantau beberapa DS. Hanya melihat — jadwal dan absensi tetap dikerjakan Captain.
+const ARCON: Tab[] = [
+  { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di DS yang Anda pegang', Icon: LayoutDashboard, View: () => <Dashboard /> },
+  { nama: 'Data Rider', desc: 'Lihat rider di DS yang Anda pegang', Icon: Users, View: DataRider },
+  { nama: 'Jadwal', desc: 'Lihat jadwal DS yang Anda pegang. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: ({ dsList }) => <JadwalSemua daftar={dsList} /> },
+  { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya dan kunci absensi mingguan di DS Anda', Icon: ClipboardList, View: Rekap },
+]
+const RIDER: Tab[] = [{ nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda', Icon: CalendarCheck, View: JadwalSaya }]
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
@@ -37,11 +45,13 @@ export default function App() {
     return () => data.subscription.unsubscribe()
   }, [])
 
-  if (session === undefined) return <p className="p-4">Memuat…</p>
+  if (session === undefined) return <p className="p-6 text-muted-foreground">Memuat…</p>
   if (session) return <AdminApp email={session.user.email ?? ''} />
   if (kode) return <RiderApp kode={kode} out={() => { store.del('kode'); setKode('') }} />
   return <Login onKode={(k) => { store.set('kode', k); setKode(k) }} />
 }
+
+const initials = (n: string) => n.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
 
 // Satu halaman login, toggle Admin (email+password) / Rider (Kode MTR)
 function Login({ onKode }: { onKode: (k: string) => void }) {
@@ -67,32 +77,83 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="max-w-xs mx-auto mt-24 card">
-      <h1 className="text-lg font-semibold mb-3 text-center">Dash Scheduler</h1>
-      <div className="grid grid-cols-2 mb-3 text-sm">
-        {(['admin', 'rider'] as const).map((t) => (
-          <button type="button" key={t} onClick={() => { setTab(t); setErr('') }} className={`py-1 border ${tab === t ? 'bg-slate-800 text-white' : 'bg-white'}`}>
-            {t === 'admin' ? 'Admin' : 'Rider'}
-          </button>
-        ))}
+    <div className="min-h-screen md:grid md:grid-cols-2">
+      <div className="hidden md:flex flex-col justify-between p-12 text-white bg-gradient-to-br from-primary via-primary to-primary-deep relative overflow-hidden">
+        <div className="absolute -right-24 -bottom-24 size-96 rounded-full bg-white/10" />
+        <div className="absolute -right-4 top-32 size-40 rounded-full bg-white/5" />
+        <div className="flex items-center gap-3 relative">
+          <div className="size-10 rounded-xl bg-card text-primary font-display font-bold text-lg flex items-center justify-center">D</div>
+          <div className="font-display font-bold text-lg">Dash Electric</div>
+        </div>
+        <div className="relative">
+          <h2 className="text-4xl font-bold leading-tight mb-4">Jadwal rapi.<br />Kehadiran terpantau.</h2>
+          <p className="text-white/80 max-w-sm mb-8">Captain menyusun jadwal dan mencatat siapa yang masuk setiap hari. Super-admin bisa langsung melihat rekap kehadiran tanpa menghitung manual.</p>
+          <ul className="space-y-3 text-sm">
+            {[
+              [CalendarDays, 'Jadwal per DS disusun langsung oleh Captain'],
+              [ClipboardCheck, 'Absensi harian cepat, cukup satu klik untuk hadir'],
+              [ShieldCheck, 'Data tiap DS aman: Captain hanya bisa membuka DS-nya sendiri'],
+            ].map(([I, t]) => {
+              const Icon = I as LucideIcon
+              return (
+                <li key={t as string} className="flex items-center gap-3">
+                  <span className="size-8 rounded-lg bg-white/15 flex items-center justify-center"><Icon size={16} /></span>
+                  {t as string}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+        <div className="relative font-mono text-[11px] uppercase tracking-widest text-white/60">Sistem internal · Dash Scheduler</div>
       </div>
-      <input className="inp w-full mb-2" placeholder={tab === 'admin' ? 'Email' : 'Kode MTR'} value={a} onChange={(e) => setA(e.target.value)} autoFocus />
-      {tab === 'admin' && <input className="inp w-full mb-2" type="password" placeholder="Password" value={b} onChange={(e) => setB(e.target.value)} />}
-      <Err msg={err} />
-      <button className="btn w-full" disabled={busy || !a.trim() || (tab === 'admin' && !b)}>Masuk</button>
-    </form>
+
+      <div className="relative flex items-center justify-center p-6 min-h-screen md:min-h-0">
+        <div className="absolute top-4 right-4"><TemaSwitch /></div>
+        <form onSubmit={submit} className="w-full max-w-sm">
+          <div className="md:hidden flex items-center gap-3 mb-8">
+            <Logo />
+            <div className="font-display font-bold text-xl">Dash Scheduler</div>
+          </div>
+          <h1 className="text-2xl font-bold mb-1">Masuk</h1>
+          <p className="text-sm text-muted-foreground mb-6">Pilih cara masuk sesuai peran Anda.</p>
+          <div className="grid grid-cols-2 gap-1 p-1 mb-5 rounded-lg bg-muted">
+            {(['admin', 'rider'] as const).map((t) => (
+              <button type="button" key={t} onClick={() => { setTab(t); setErr('') }} className={`tab text-center ${tab === t ? 'tab-on' : ''}`}>
+                {t === 'admin' ? 'Captain / Admin' : 'Rider'}
+              </button>
+            ))}
+          </div>
+          <label className="lbl">{tab === 'admin' ? 'Email' : 'Kode MTR'}</label>
+          <input className="inp w-full mb-4 !py-2.5" value={a} onChange={(e) => setA(e.target.value)} autoFocus placeholder={tab === 'admin' ? 'nama@dashelectric.co' : 'MTR001'} />
+          {tab === 'admin' && (
+            <>
+              <label className="lbl">Password</label>
+              <input className="inp w-full mb-4 !py-2.5" type="password" value={b} onChange={(e) => setB(e.target.value)} />
+            </>
+          )}
+          <Err msg={err} />
+          <button className="btn btn-lg w-full" disabled={busy || !a.trim() || (tab === 'admin' && !b)}>{busy ? 'Memproses…' : 'Masuk'}</button>
+          <p className="text-xs text-muted-foreground/70 mt-6 text-center">Akun Captain dibuat oleh Super-admin. Lupa password? Hubungi Super-admin.</p>
+        </form>
+      </div>
+    </div>
   )
 }
 
 function AdminApp({ email }: { email: string }) {
   const [me, setMe] = useState<Me | null | undefined>(undefined)
   const [ds, setDs] = useState<Ds | null>(null)
+  const [dsList, setDsList] = useState<Ds[]>([])
   const [tab, setTab] = useState(0)
 
   useEffect(() => {
     ;(async () => {
       const { data } = await sb.from('riders').select('id,nama,peran,ds_id,email').eq('email', email.toLowerCase()).maybeSingle()
       setMe(data as Me | null)
+      if (data?.peran === 'arcon') {
+        const r = await sb.from('ds').select('*').eq('arcon_id', data.id).order('nama')
+        setDsList((r.data ?? []) as Ds[])
+      }
       if (data?.peran === 'captain') {
         const r = await sb.from('ds').select('*').eq('captain_id', data.id).maybeSingle()
         setDs(r.data as Ds | null)
@@ -100,34 +161,82 @@ function AdminApp({ email }: { email: string }) {
     })()
   }, [email])
 
-  if (me === undefined) return <p className="p-4">Memuat…</p>
+  if (me === undefined) return <p className="p-6 text-muted-foreground">Memuat…</p>
   if (me === null)
     return (
-      <div className="max-w-sm mx-auto mt-24 card text-center">
-        <p className="mb-3">Email <b>{email}</b> belum terdaftar sebagai Captain / Super-admin (atau nonaktif).</p>
-        <button className="btn" onClick={() => sb.auth.signOut()}>Keluar</button>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-sm card text-center !p-6">
+          <ShieldCheck className="mx-auto mb-3 text-muted-foreground/70" size={32} />
+          <p className="mb-4 text-sm">Email <b>{email}</b> belum terdaftar sebagai Captain atau Super-admin, atau akunnya sedang nonaktif. Hubungi Super-admin.</p>
+          <button className="btn" onClick={() => sb.auth.signOut()}>Keluar</button>
+        </div>
       </div>
     )
 
-  const tabs = me.peran === 'super_admin' ? SUPER : me.peran === 'captain' ? CAPTAIN : RIDER
-  const [, View] = tabs[tab] ?? tabs[0]
+  const tabs = me.peran === 'super_admin' ? SUPER : me.peran === 'captain' ? CAPTAIN : me.peran === 'arcon' ? ARCON : RIDER
+  const lokasi = ds ? ds.nama : me.peran === 'arcon' ? `${dsList.length} DS` : ''
+  const cur = tabs[tab] ?? tabs[0]
+  const peran = me.peran.replace('_', '-')
+  const tgl = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <header className="flex items-center gap-3 mb-3">
-        <h1 className="font-semibold">Dash Scheduler</h1>
-        <span className="text-sm text-slate-600">{me.nama} · {me.peran.replace('_', '-')}{ds ? ` · ${ds.nama}` : ''}</span>
-        <button className="btn2 ml-auto" onClick={() => sb.auth.signOut()}>Keluar</button>
-      </header>
-      {me.peran === 'captain' && <Notif me={me} />}
-      <nav className="flex flex-wrap gap-1 mb-4 border-b border-slate-200">
-        {tabs.map(([nama], i) => (
-          <button key={nama} onClick={() => setTab(i)} className={`px-3 py-1.5 text-sm -mb-px border-b-2 ${i === tab ? 'border-slate-800 font-medium' : 'border-transparent text-slate-500'}`}>
-            {nama}
-          </button>
-        ))}
-      </nav>
-      <View key={tab} me={me} ds={ds} />
+    <div className="min-h-screen md:flex">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground p-4 sticky top-0 h-screen">
+        <div className="flex items-center gap-3 px-2 mb-8 mt-1">
+          <Logo small />
+          <div>
+            <div className="font-display font-bold text-white leading-none">Dash</div>
+            <div className="font-mono text-[10px] tracking-widest uppercase mt-1">Scheduler</div>
+          </div>
+        </div>
+        <nav className="space-y-1 flex-1">
+          {tabs.map((t, i) => (
+            <button key={t.nama} onClick={() => setTab(i)} className={`nav ${i === tab ? 'nav-on' : ''}`}>
+              <t.Icon size={18} />
+              {t.nama}
+            </button>
+          ))}
+        </nav>
+        <div className="border-t border-white/10 pt-4 flex items-center gap-3">
+          <div className="size-9 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center">{initials(me.nama)}</div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="text-sm font-semibold text-white truncate">{me.nama}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider truncate">{peran}{lokasi ? ` · ${lokasi}` : ''}</div>
+          </div>
+          <TemaToggle className="hover:!bg-white/10 hover:text-white" />
+          <button onClick={() => sb.auth.signOut()} title="Keluar" className="p-2 rounded-md hover:bg-white/10 hover:text-white"><LogOut size={16} /></button>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0">
+        <div className="md:hidden bg-sidebar text-white px-4 py-3 flex items-center gap-3">
+          <Logo small />
+          <div className="flex-1 leading-tight min-w-0">
+            <div className="text-sm font-semibold truncate">{me.nama}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-sidebar-foreground truncate">{peran}{lokasi ? ` · ${lokasi}` : ''}</div>
+          </div>
+          <TemaToggle className="hover:!bg-white/10" />
+          <button onClick={() => sb.auth.signOut()} className="p-2"><LogOut size={18} /></button>
+        </div>
+        <nav className="md:hidden flex gap-1 p-2 bg-card border-b border-border overflow-x-auto">
+          {tabs.map((t, i) => (
+            <button key={t.nama} onClick={() => setTab(i)} className={`tab ${i === tab ? 'tab-on' : ''}`}>{t.nama}</button>
+          ))}
+        </nav>
+
+        <header className="px-4 md:px-8 pt-6 pb-5 flex flex-wrap items-center gap-4 border-b border-border bg-card/80 backdrop-blur sticky top-0 z-10"><div className="size-12 rounded-2xl bg-primary-soft text-primary flex items-center justify-center"><cur.Icon size={24} /></div>
+          <div className="flex-1 min-w-60">
+            <h2 className="text-2xl font-bold">{cur.nama}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">{cur.desc}</p>
+          </div>
+          <span className="hidden lg:inline font-mono text-xs text-muted-foreground bg-muted rounded-full px-3 py-1.5">{tgl}</span>
+          <TemaSwitch />
+        </header>
+        <main className="px-4 md:px-8 py-6 max-w-6xl">
+          {me.peran === 'captain' && <Notif me={me} />}
+          <div key={tab} className="rise"><cur.View me={me} ds={ds} dsList={dsList} /></div>
+        </main>
+      </div>
     </div>
   )
 }
@@ -140,12 +249,13 @@ function Notif({ me }: { me: Me }) {
   )
   if (!n.rows.length) return null
   return (
-    <div className="bg-amber-50 border border-amber-300 rounded p-2 mb-3 text-sm">
+    <div className="bg-primary-soft border border-primary/30 rounded-xl p-3 mb-4 text-sm space-y-1">
       {n.rows.map((x) => (
-        <div key={x.id} className="flex gap-2">
+        <div key={x.id} className="flex items-center gap-2">
+          <BellRing size={16} className="text-primary shrink-0" />
           <span>{x.pesan}</span>
-          <button className="underline ml-auto" onClick={async () => { await sb.from('notifikasi').update({ dibaca: true }).eq('id', x.id); n.reload() }}>
-            tandai dibaca
+          <button className="underline text-primary-soft-foreground ml-auto shrink-0" onClick={async () => { await sb.from('notifikasi').update({ dibaca: true }).eq('id', x.id); n.reload() }}>
+            Tandai sudah dibaca
           </button>
         </div>
       ))}

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, type Ds, type Me, type Rider } from './lib'
+import { Copy, Sparkles } from 'lucide-react'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
+import { buatDraf } from './otomatis'
+
+const SIKLUS = ['', 'pagi', 'siang'] // urutan ganti saat sel diklik
 
 // Grid jadwal 1 DS × 1 minggu (Senin–Minggu). editable = Captain; read-only = Super-admin.
 export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
@@ -18,6 +22,32 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
 
   const cnt = (d: string, s: string) => riders.rows.filter((r) => g[`${r.id}|${d}`] === s).length
   const shown = riders.rows.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
+  const pg = usePage(shown, [q, ds.id, start])
+
+  const adaIsi = days.some((d) => riders.rows.some((r) => g[`${r.id}|${d}`]))
+
+  // Draf otomatis: dibagi sesuai kuota DS secara adil. Belum tersimpan sampai Captain klik "Simpan jadwal".
+  const susunOtomatis = () => {
+    if (ds.kuota_pagi + ds.kuota_siang === 0) return toast('Kuota DS masih 0. Minta Super-admin mengisi kuota pagi dan siang di Kelola DS & Captain.')
+    if (!riders.rows.length) return toast('Belum ada rider aktif di DS ini.')
+    if (adaIsi && !confirm('Jadwal minggu ini sudah ada isinya. Ganti dengan draf otomatis?')) return
+    const { grid, kurang } = buatDraf(riders.rows.map((r) => r.id), days, ds.kuota_pagi, ds.kuota_siang)
+    setG(grid)
+    toast.ok(`Draf jadwal dibuat (${Object.keys(grid).length} shift). Periksa dulu, lalu klik Simpan jadwal.`)
+    if (kurang.length) toast(`Rider kurang untuk memenuhi kuota di ${kurang.length} hari (mulai ${hari(kurang[0].tanggal)}). Tambah rider atau kurangi kuota.`)
+  }
+
+  const salinMingguLalu = async () => {
+    const { data, error } = await sb.from('jadwal').select('rider_id,tanggal,shift').eq('ds_id', ds.id).gte('tanggal', addDays(start, -7)).lte('tanggal', addDays(start, -1))
+    if (error) return toast(error.message)
+    const aktif = new Set(riders.rows.map((r) => r.id)) // rider yang sudah pindah/nonaktif tidak ikut disalin
+    const baru: Record<string, string> = {}
+    for (const r of data ?? []) if (aktif.has(r.rider_id)) baru[`${r.rider_id}|${addDays(r.tanggal, 7)}`] = r.shift
+    if (!Object.keys(baru).length) return toast('Minggu lalu belum ada jadwal untuk disalin.')
+    if (adaIsi && !confirm('Jadwal minggu ini sudah ada isinya. Ganti dengan salinan minggu lalu?')) return
+    setG(baru)
+    toast.ok('Jadwal minggu lalu disalin. Periksa dulu, lalu klik Simpan jadwal.')
+  }
 
   const save = async () => {
     const rows = Object.entries(g)
@@ -27,7 +57,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         return { rider_id, tanggal, shift }
       })
     if (await ok(sb.rpc('simpan_jadwal', { p_ds: ds.id, p_dari: days[0], p_sampai: days[6], p_rows: rows }))) {
-      alert('Jadwal tersimpan')
+      toast.ok('Jadwal berhasil disimpan')
       j.reload()
     }
   }
@@ -42,13 +72,16 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         <button className="btn2" onClick={() => setStart(addDays(start, 7))}>→</button>
         <input className="inp" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         {editable && (
-          <button className="btn ml-auto" onClick={save}>
-            Simpan jadwal
-          </button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button className="btn2" onClick={salinMingguLalu}><Copy size={14} />Salin minggu lalu</button>
+            <button className="btn2" onClick={susunOtomatis}><Sparkles size={14} />Susun otomatis</button>
+            <button className="btn" onClick={save}>Simpan jadwal</button>
+          </div>
         )}
       </div>
       <Err msg={riders.err || j.err} />
-      <div className="overflow-x-auto">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr>
@@ -59,10 +92,10 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {pg.rows.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">
-                  {r.nama} <span className="text-slate-400">{r.kode_mtr}</span>
+                  {r.nama} <span className="text-muted-foreground/70">{r.kode_mtr}</span>
                 </td>
                 {days.map((d) => {
                   const k = `${r.id}|${d}`
@@ -70,60 +103,64 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                   return (
                     <td key={d}>
                       {editable ? (
-                        <select className="inp" value={v} onChange={(e) => setG({ ...g, [k]: e.target.value })}>
-                          <option value="">—</option>
-                          <option value="pagi">Pagi</option>
-                          <option value="siang">Siang</option>
-                        </select>
+                        <button
+                          type="button"
+                          title="Klik untuk mengganti: kosong → pagi → siang"
+                          onClick={() => setG({ ...g, [k]: SIKLUS[(SIKLUS.indexOf(v) + 1) % SIKLUS.length] })}
+                          className={`w-20 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                            v === 'pagi' ? 'border-warning/30 bg-warning-soft text-warning'
+                            : v === 'siang' ? 'border-primary/30 bg-primary-soft text-primary-soft-foreground'
+                            : 'border-dashed border-input text-muted-foreground/70 hover:border-primary hover:text-primary'
+                          }`}
+                        >
+                          {v === 'pagi' ? 'Pagi' : v === 'siang' ? 'Siang' : '—'}
+                        </button>
                       ) : (
-                        v && <span className="capitalize">{v}</span>
+                        v && <span className={`badge capitalize ${v === 'pagi' ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary-soft-foreground'}`}>{v}</span>
                       )}
                     </td>
                   )
                 })}
               </tr>
             ))}
-            <tr className="bg-slate-50 font-medium">
-              <td>Terisi / kuota</td>
+            <tr className="bg-muted/50 font-medium">
+              <td>Jumlah rider / kuota</td>
               {days.map((d) => {
                 const p = cnt(d, 'pagi')
                 const s = cnt(d, 'siang')
                 return (
                   <td key={d} className="whitespace-nowrap">
-                    <span className={p !== ds.kuota_pagi ? 'text-amber-600' : 'text-green-700'}>P {p}/{ds.kuota_pagi}</span>
+                    <span className={p !== ds.kuota_pagi ? 'text-warning' : 'text-success'}>P {p}/{ds.kuota_pagi}</span>
                     {' · '}
-                    <span className={s !== ds.kuota_siang ? 'text-amber-600' : 'text-green-700'}>S {s}/{ds.kuota_siang}</span>
+                    <span className={s !== ds.kuota_siang ? 'text-warning' : 'text-success'}>S {s}/{ds.kuota_siang}</span>
                   </td>
                 )
               })}
             </tr>
           </tbody>
         </table>
+        </div>
+        <Pagination {...pg} />
       </div>
-      {editable && <p className="text-xs text-slate-500 mt-2">Kuota hanya peringatan (kuning = belum pas), jadwal tetap bisa disimpan.</p>}
+      {editable && <p className="text-xs text-muted-foreground mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan. "Susun otomatis" membagi shift sesuai kuota secara adil (maksimal 6 hari kerja per rider, jadi ada minimal 1 hari libur). Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal.</p>}
     </div>
   )
 }
 
 export function JadwalDs({ ds }: { me: Me; ds: Ds | null }) {
-  return ds ? <JadwalGrid key={ds.id} ds={ds} editable /> : <p>Anda belum ditunjuk sebagai Captain DS manapun.</p>
+  return ds ? <JadwalGrid key={ds.id} ds={ds} editable /> : <p>Anda belum ditunjuk sebagai Captain di DS mana pun.</p>
 }
 
 // Super-admin: lihat jadwal semua DS (read-only — penyusunan sepenuhnya di Captain)
-export function JadwalSemua() {
+export function JadwalSemua({ daftar }: { daftar?: Ds[] }) {
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
+  const rows = daftar ?? dsl.rows // Arcon: hanya DS yang dipegang; Super-admin: semua DS
   const [id, setId] = useState('')
-  const ds = dsl.rows.find((d) => d.id === (id || dsl.rows[0]?.id))
+  const ds = rows.find((d) => d.id === (id || rows[0]?.id))
   return (
     <div>
-      <select className="inp mb-3" value={ds?.id ?? ''} onChange={(e) => setId(e.target.value)}>
-        {dsl.rows.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.nama}
-          </option>
-        ))}
-      </select>
-      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-slate-500">Belum ada DS.</p>}
+      <Select className="mb-3 w-72 max-w-full" value={ds?.id ?? ''} onChange={setId} placeholder="Pilih DS" opsi={rows.map((d) => ({ value: d.id, label: d.nama }))} />
+      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
     </div>
   )
 }

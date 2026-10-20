@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
+import { WARNA } from './daily'
+import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
 type DsRow = {
   ds_id: string; ds_nama: string; dijadwalkan: number; terisi: number; patuh: number; alpha: number; tukar: number
@@ -28,13 +30,9 @@ function useRange() {
     mode === 'harian' ? [ref, ref] : mode === 'mingguan' ? [monday(ref), addDays(monday(ref), 6)] : [ref.slice(0, 8) + '01', lastOfMonth(ref)]
   const ui = (
     <div className="flex flex-wrap gap-2 items-center mb-3">
-      <select className="inp" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
-        <option value="harian">Harian</option>
-        <option value="mingguan">Mingguan (Sen–Min)</option>
-        <option value="bulanan">Bulanan</option>
-      </select>
+      <Select className="w-52" value={mode} onChange={(v) => setMode(v as typeof mode)} opsi={[{ value: 'harian', label: 'Harian' }, { value: 'mingguan', label: 'Mingguan (Senin–Minggu)' }, { value: 'bulanan', label: 'Bulanan' }]} />
       <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
-      <span className="text-sm text-slate-600">
+      <span className="text-sm text-muted-foreground">
         {from} s/d {to}
       </span>
     </div>
@@ -43,13 +41,23 @@ function useRange() {
 }
 
 function DsTable({ rows }: { rows: DsRow[] }) {
+  const pg = usePage(rows)
+  return (
+    <>
+      <DsTabelIsi rows={pg.rows} />
+      <Pagination {...pg} />
+    </>
+  )
+}
+
+function DsTabelIsi({ rows }: { rows: DsRow[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="tbl">
         <thead>
           <tr>
-            <th>DS</th><th>Dijadwalkan</th><th>Kepatuhan</th><th>Alpha</th><th>Tukar</th><th>Pengganti</th>
-            <th>Belum diisi</th><th>Hari kosong</th><th>Input terakhir</th>
+            <th>DS</th><th>Terjadwal</th><th>Sesuai jadwal</th><th>Alpha</th><th>Tukar</th><th>Pengganti</th>
+            <th>Belum diisi</th><th>Hari belum diisi</th><th>Terakhir mengisi</th>
           </tr>
         </thead>
         <tbody>
@@ -57,7 +65,7 @@ function DsTable({ rows }: { rows: DsRow[] }) {
             <tr key={d.ds_id}>
               <td>{d.ds_nama}</td><td>{d.dijadwalkan}</td><td className="font-medium">{pct(d)}</td><td>{d.alpha}</td><td>{d.tukar}</td>
               <td>{d.pengganti}</td><td>{d.belum_diisi}</td>
-              <td className={d.hari_belum_isi ? 'text-red-600 font-medium' : ''}>{d.hari_belum_isi}</td>
+              <td className={d.hari_belum_isi ? 'text-danger font-medium' : ''}>{d.hari_belum_isi}</td>
               <td className="text-xs">{jam(d.terakhir_input)}</td>
             </tr>
           ))}
@@ -75,10 +83,10 @@ function Top({ title, rows, k }: { title: string; rows: RiderRow[]; k: 'alpha' |
       <ol className="list-decimal ml-5 mt-1 text-sm">
         {t.map((r) => (
           <li key={r.rider_id}>
-            {r.nama} <span className="text-slate-400">({r.ds_nama ?? '-'})</span> — {r[k]}×
+            {r.nama} <span className="text-muted-foreground/70">({r.ds_nama ?? '-'})</span> — {r[k]}×
           </li>
         ))}
-        {!t.length && <li className="list-none text-slate-500">Tidak ada.</li>}
+        {!t.length && <li className="list-none text-muted-foreground">Tidak ada.</li>}
       </ol>
     </div>
   )
@@ -93,25 +101,78 @@ export function Dashboard() {
     () =>
       sb.from('perpindahan_rider')
         .select('waktu,rider:riders!perpindahan_rider_rider_id_fkey(nama),dari:ds!perpindahan_rider_dari_ds_fkey(nama),ke:ds!perpindahan_rider_ke_ds_fkey(nama),oleh:riders!perpindahan_rider_ditarik_oleh_fkey(nama)')
-        .order('waktu', { ascending: false }).limit(15),
+        .order('waktu', { ascending: false }).limit(10),
     [],
   )
   const log = useRows<Any>(
-    () => sb.from('log_aktivitas').select('waktu,aksi,detail,captain:riders!log_aktivitas_captain_id_fkey(nama)').order('waktu', { ascending: false }).limit(15),
+    () => sb.from('log_aktivitas').select('waktu,aksi,detail,captain:riders!log_aktivitas_captain_id_fkey(nama)').order('waktu', { ascending: false }).limit(10),
     [],
   )
   const kosong = d.rows.filter((x) => x.hari_belum_isi > 0)
+  const sum = (k: 'dijadwalkan' | 'terisi' | 'patuh' | 'alpha') => d.rows.reduce((a, x) => a + x[k], 0)
+  const kepatuhan = sum('terisi') > 0 ? Math.round((100 * sum('patuh')) / sum('terisi')) + '%' : '–'
   return (
     <div>
       {ui}
       <Err msg={d.err || r.err} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <Stat icon={TrendingUp} label="Hadir sesuai jadwal" value={kepatuhan} />
+        <Stat icon={CalendarDays} label="Shift terjadwal" value={sum('dijadwalkan')} tone="zinc" />
+        <Stat icon={UserX} label="Alpha (tidak hadir tanpa kabar)" value={sum('alpha')} tone={sum('alpha') ? 'red' : 'zinc'} />
+        <Stat icon={ClipboardX} label="DS belum isi absensi" value={kosong.length} tone={kosong.length ? 'red' : 'zinc'} />
+      </div>
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+        <div className="card !mb-0">
+          <b className="block mb-3">Hadir sesuai jadwal per DS</b>
+          {d.rows.length === 0 && <Kosong teks="Belum ada DS" hint="Buat DS di tab Kelola DS & Captain." />}
+          {d.rows.map((x) => {
+            const p = x.terisi ? Math.round((100 * x.patuh) / x.terisi) : 0
+            return (
+              <div key={x.ds_id} className="mb-3 last:mb-0">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-medium">{x.ds_nama}</span>
+                  <span className="font-mono">{pct(x)}</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div className={`h-full rounded-full ${p >= 90 ? 'bg-primary' : p >= 70 ? 'bg-primary/60' : 'bg-danger'}`} style={{ width: `${p}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="card !mb-0">
+          <b className="block mb-3">Rincian kehadiran</b>
+          {(() => {
+            const seg = (['hadir', 'alpha', 'izin', 'sakit', 'tukar', 'pengganti'] as const).map((k) => ({ k, n: r.rows.reduce((a, x) => a + x[k], 0) }))
+            const warna: Record<string, string> = { hadir: 'bg-foreground', alpha: 'bg-danger', izin: 'bg-muted-foreground/60', sakit: 'bg-muted-foreground/40', tukar: 'bg-primary/40', pengganti: 'bg-primary' }
+            const total = seg.reduce((a, s) => a + s.n, 0)
+            if (!total) return <Kosong teks="Belum ada data kehadiran di periode ini" hint="Data muncul setelah Captain mengisi absensi harian." />
+            return (
+              <>
+                <div className="flex h-4 rounded-full overflow-hidden mb-4">
+                  {seg.filter((s) => s.n).map((s) => <div key={s.k} className={warna[s.k]} style={{ width: `${(100 * s.n) / total}%` }} title={`${s.k}: ${s.n}`} />)}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  {seg.map((s) => (
+                    <div key={s.k} className="flex items-center gap-2">
+                      <span className={`size-2.5 rounded-full ${warna[s.k]}`} />
+                      <span className="capitalize text-muted-foreground">{s.k}</span>
+                      <span className="font-mono font-semibold ml-auto">{s.n}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
+        </div>
+      </div>
       {kosong.length > 0 && (
-        <div className="bg-red-50 border border-red-300 rounded p-3 mb-4 text-sm">
-          <b>DS belum isi actual:</b>
+        <div className="bg-danger-soft border border-danger/30 rounded p-3 mb-4 text-sm">
+          <b>DS yang belum mengisi absensi:</b>
           <ul className="list-disc ml-5">
             {kosong.map((x) => (
               <li key={x.ds_id}>
-                {x.ds_nama}: {x.hari_belum_isi} hari belum diisi (terakhir input {jam(x.terakhir_input)})
+                {x.ds_nama}: {x.hari_belum_isi} hari belum diisi (terakhir mengisi: {jam(x.terakhir_input)})
               </li>
             ))}
           </ul>
@@ -119,15 +180,15 @@ export function Dashboard() {
       )}
       <div className="card">
         <div className="flex justify-between mb-2">
-          <b>Kepatuhan per DS</b>
+          <b>Ringkasan per DS</b>
           <button className="btn2" onClick={() => download(`ringkasan-ds_${from}_${to}.csv`, toCsv(d.rows.map((x) => ({ ...x, kepatuhan: pct(x) }))))}>
-            Ekspor CSV
+            Unduh CSV
           </button>
         </div>
         <DsTable rows={d.rows} />
       </div>
       <div className="grid md:grid-cols-2 gap-4">
-        <Top title="Langganan alpha" rows={r.rows} k="alpha" />
+        <Top title="Sering tidak hadir (Alpha)" rows={r.rows} k="alpha" />
         <Top title="Sering jadi pengganti" rows={r.rows} k="pengganti" />
       </div>
       <div className="grid md:grid-cols-2 gap-4">
@@ -136,7 +197,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {pindah.rows.map((p: Any, i: number) => (
               <li key={i}>
-                {p.rider?.nama}: {p.dari?.nama ?? 'kolam bebas'} → {p.ke?.nama ?? 'kolam bebas'} <span className="text-slate-400">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
+                {p.rider?.nama}: {p.dari?.nama ?? 'belum punya DS'} → {p.ke?.nama ?? 'belum punya DS'} <span className="text-muted-foreground/70">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -146,7 +207,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {log.rows.map((l: Any, i: number) => (
               <li key={i}>
-                {l.captain?.nama}: {l.aksi} <span className="text-slate-400">{l.detail} · {jam(l.waktu)}</span>
+                {l.captain?.nama}: {l.aksi} <span className="text-muted-foreground/70">{l.detail} · {jam(l.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -157,13 +218,13 @@ export function Dashboard() {
 }
 
 // Super-admin: Laporan Actual · Captain: Rekap DS Saya (RLS otomatis membatasi Captain ke DS-nya)
-export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
-  const sup = me.peran === 'super_admin'
+export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?: Ds[] }) {
+  const luas = me.peran !== 'captain' // Super-admin (semua DS) dan Arcon (beberapa DS) memilih DS lewat filter
   const { from, to, ui } = useRange()
   const [dsf, setDsf] = useState('')
   const [q, setQ] = useState('')
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
-  const dsId = sup ? dsf : ds?.id ?? ''
+  const dsId = luas ? dsf : ds?.id ?? ''
   const dsNama = dsl.rows.find((x) => x.id === dsId)?.nama
   const d = useRows<DsRow>(() => sb.rpc('laporan_ds', { p_dari: from, p_sampai: to }), [from, to])
   const r = useRows<RiderRow>(() => sb.rpc('laporan_rider', { p_dari: from, p_sampai: to }), [from, to])
@@ -181,58 +242,57 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
     pengganti_untuk_atau_backup: x.backup?.nama ?? '', penjelasan: x.penjelasan ?? '', diinput_oleh: x.oleh?.nama ?? '', jam_input: x.jam_input,
   }))
 
+  const pgR = usePage(rRows, [q, dsId, from, to])
+  const pgD = usePage(det.rows, [from, to, dsId])
+
   return (
     <div>
       {ui}
       <div className="flex flex-wrap gap-2 mb-3">
-        {sup && (
-          <select className="inp" value={dsf} onChange={(e) => setDsf(e.target.value)}>
-            <option value="">Semua DS</option>
-            {dsl.rows.map((x) => (
-              <option key={x.id} value={x.id}>{x.nama}</option>
-            ))}
-          </select>
+        {luas && (
+          <Select className="w-56" value={dsf} onChange={setDsf} opsi={[{ value: '', label: 'Semua DS' }, ...(me.peran === 'super_admin' ? dsl.rows : dsList).map((x) => ({ value: x.id, label: x.nama }))]} />
         )}
         <input className="inp" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn2 ml-auto" onClick={() => download(`rekap-rider_${from}_${to}.csv`, toCsv(rRows as unknown as Record<string, unknown>[]))}>Ekspor rekap rider</button>
-        <button className="btn2" onClick={() => download(`actual-detail_${from}_${to}.csv`, toCsv(flat))}>Ekspor detail actual</button>
+        <button className="btn2 ml-auto" onClick={() => download(`rekap-rider_${from}_${to}.csv`, toCsv(rRows as unknown as Record<string, unknown>[]))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh rekap rider</button>
+        <button className="btn2" onClick={() => download(`actual-detail_${from}_${to}.csv`, toCsv(flat))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh detail absensi</button>
       </div>
       <Err msg={d.err || r.err || det.err} />
       <div className="card"><DsTable rows={dsRows} /></div>
-      <div className="card overflow-x-auto">
+      <div className="card">
         <b>Rekap per rider</b>
-        <table className="tbl mt-2">
+        <div className="overflow-x-auto"><table className="tbl mt-2">
           <thead>
-            <tr><th>Rider</th><th>DS</th><th>Dijadwalkan</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th></tr>
+            <tr><th>Rider</th><th>DS</th><th>Terjadwal</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th></tr>
           </thead>
           <tbody>
-            {rRows.map((x) => (
+            {pgR.rows.map((x) => (
               <tr key={x.rider_id}>
-                <td>{x.nama} <span className="text-slate-400">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
-                <td className={x.alpha ? 'text-red-600 font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
+                <td>{x.nama} <span className="text-muted-foreground/70">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
+                <td className={x.alpha ? 'text-danger font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
+        <Pagination {...pgR} />
       </div>
-      <div className="card overflow-x-auto">
-        <b>Detail actual ({flat.length}{flat.length === 1000 ? '+' : ''} baris)</b>
-        <table className="tbl mt-2">
+      <div className="card">
+        <b>Detail absensi ({flat.length}{flat.length === 1000 ? '+' : ''} baris)</b>
+        <div className="overflow-x-auto"><table className="tbl mt-2">
           <thead>
             <tr><th>Tanggal</th><th>DS</th><th>Rider</th><th>Status</th><th>Terkait</th><th>Penjelasan</th><th>Diinput</th></tr>
           </thead>
           <tbody>
-            {det.rows.slice(0, 200).map((x: Any, i: number) => (
+            {pgD.rows.map((x: Any, i: number) => (
               <tr key={i}>
-                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td>{x.status}</td><td>{x.backup?.nama}</td><td>{x.penjelasan}</td>
+                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama}</td><td>{x.penjelasan}</td>
                 <td className="text-xs">{x.oleh?.nama} · {jam(x.jam_input)}</td>
               </tr>
             ))}
           </tbody>
-        </table>
-        {det.rows.length > 200 && <p className="text-xs text-slate-500 mt-1">Menampilkan 200 pertama — ekspor CSV untuk semuanya.</p>}
+        </table></div>
+        <Pagination {...pgD} />
       </div>
-      {dsId && <Kunci dsId={dsId} />}
+      {dsId ? <Kunci dsId={dsId} /> : luas && <div className="card text-sm text-muted-foreground">Pilih satu DS di atas untuk mengunci absensi mingguannya.</div>}
     </div>
   )
 }
@@ -243,7 +303,8 @@ function Kunci({ dsId }: { dsId: string }) {
   const weeks = Array.from({ length: 6 }, (_, i) => addDays(monday(today()), -7 * (i + 1)))
   return (
     <div className="card">
-      <b>Kunci periode mingguan</b>
+      <b>Kunci absensi mingguan</b>
+      <p className="text-xs text-muted-foreground mt-0.5">Setelah dikunci, absensi minggu itu tidak bisa diubah lagi supaya hitungan gaji tidak berubah.</p>
       <ul className="mt-2 text-sm space-y-1">
         {weeks.map((w) => {
           const locked = kunci.rows.some((k) => k.minggu_mulai === w)
@@ -251,12 +312,12 @@ function Kunci({ dsId }: { dsId: string }) {
             <li key={w} className="flex items-center gap-2">
               <span>{hari(w)} – {hari(addDays(w, 6))}</span>
               {locked ? (
-                <span className="text-green-700">🔒 terkunci</span>
+                <span className="text-success">🔒 terkunci</span>
               ) : (
                 <button
                   className="btn2"
                   onClick={async () => {
-                    if (confirm('Kunci actual minggu ini? Tidak bisa diubah lagi.') && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
+                    if (confirm('Kunci absensi minggu ini? Setelah dikunci tidak bisa diubah lagi.') && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
                   }}
                 >
                   Kunci

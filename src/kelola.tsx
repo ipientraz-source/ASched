@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { sb, useRows, ok, Err, RiderPick, type Ds, type Rider } from './lib'
+import { Plus } from 'lucide-react'
+import { sb, useRows, ok, toast, Err, Field, RiderPick, usePage, Pagination, type Ds, type Rider } from './lib'
 
 // Buat / ganti password akun login lewat edge function (service role ada di server, bukan di browser)
 async function buatAkun(email: string, password: string) {
@@ -7,83 +8,209 @@ async function buatAkun(email: string, password: string) {
   if (!error) return true
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const detail = await (error as any).context?.json?.().then((j: any) => j.error).catch(() => null)
-  alert(`Akun login gagal dibuat: ${detail ?? error.message}\nAlternatif: buat manual di Supabase → Authentication → Users.`)
+  toast(`Akun login gagal dibuat: ${detail ?? error.message}\nAlternatif: buat manual di Supabase → Authentication → Users.`)
   return false
 }
+
+const LANGKAH = [
+  ['Buat DS', 'Tulis nama tiap DS (depot/store) satu per satu.'],
+  ['Isi kuota', 'Tentukan berapa rider yang harus masuk di tiap shift setiap hari.'],
+  ['Pilih Captain', 'Pilih rider yang menyusun jadwal dan mengisi absensi DS itu.'],
+]
 
 export function Kelola() {
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
   const rs = useRows<Rider>(() => sb.from('riders').select('*').order('nama').limit(1000), [])
   const [nama, setNama] = useState('')
   const [cari, setCari] = useState('')
-  const candidates = rs.rows.filter((r) => r.peran !== 'super_admin' && r.status === 'aktif')
+  const candidates = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'captain') && r.status === 'aktif')
+  const kandidatArcon = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'arcon') && r.status === 'aktif') // Captain tidak bisa merangkap Arcon
+  const tampil = dsl.rows.filter((d) => (d.nama + (rs.rows.find((r) => r.id === d.captain_id)?.nama ?? '')).toLowerCase().includes(cari.toLowerCase()))
+  const pg = usePage(tampil, [cari])
 
   return (
     <div>
       <Err msg={dsl.err || rs.err} />
+
+      <div className="card !bg-primary-soft !border-primary/20">
+        <b className="block mb-3">Cara menyiapkan DS</b>
+        <ol className="grid sm:grid-cols-3 gap-4">
+          {LANGKAH.map(([judul, isi], i) => (
+            <li key={judul} className="flex gap-3">
+              <span className="size-7 shrink-0 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">{i + 1}</span>
+              <div className="text-sm">
+                <div className="font-semibold">{judul}</div>
+                <div className="text-muted-foreground">{isi}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="text-xs text-muted-foreground mt-3">Buat DS lebih dulu sebelum import rider, supaya nama DS di file CSV cocok.</p>
+      </div>
+
       <div className="card">
-        <b className="block mb-2">Buat DS baru</b>
-        <div className="flex gap-2">
-          <input className="inp" placeholder="Nama DS (mis. Galaxy)" value={nama} onChange={(e) => setNama(e.target.value)} />
-          <button
-            className="btn"
-            disabled={!nama.trim()}
-            onClick={async () => {
-              if (await ok(sb.from('ds').insert({ nama: nama.trim() }))) {
-                setNama('')
-                dsl.reload()
-              }
-            }}
-          >
-            Buat
-          </button>
+        <b className="block mb-3">Buat DS baru</b>
+        <div className="flex flex-wrap items-start gap-3">
+          <Field label="Nama DS" hint="Tulis persis seperti yang akan dipakai di file CSV rider, misalnya DS HAYAM WURUK." className="min-w-72 flex-1 max-w-md">
+            <input className="inp w-full" placeholder="Contoh: DS HAYAM WURUK" value={nama} onChange={(e) => setNama(e.target.value)} />
+          </Field>
+          <div className="pt-5">
+            <button
+              className="btn"
+              disabled={!nama.trim()}
+              onClick={async () => {
+                if (await ok(sb.from('ds').insert({ nama: nama.trim() }))) {
+                  setNama('')
+                  toast.ok('DS berhasil dibuat. Lanjut isi kuota dan pilih Captain.')
+                  dsl.reload()
+                }
+              }}
+            >
+              <Plus size={16} />Buat DS
+            </button>
+          </div>
         </div>
       </div>
-      <input className="inp mb-3" placeholder="cari DS / Captain" value={cari} onChange={(e) => setCari(e.target.value)} />
-      {dsl.rows
-        .filter((d) => (d.nama + (rs.rows.find((r) => r.id === d.captain_id)?.nama ?? '')).toLowerCase().includes(cari.toLowerCase()))
-        .map((d) => (
-        <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} reload={() => { dsl.reload(); rs.reload() }} />
+
+      <div className="flex items-center gap-3 mb-3">
+        <input className="inp w-72 max-w-full" placeholder="Cari DS atau nama Captain…" value={cari} onChange={(e) => setCari(e.target.value)} />
+        <span className="text-sm text-muted-foreground">{tampil.length} DS</span>
+      </div>
+      {pg.rows.map((d) => (
+        <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} kandidatArcon={kandidatArcon} semuaDs={dsl.rows} reload={() => { dsl.reload(); rs.reload() }} />
       ))}
+      {!tampil.length && <div className="card text-center text-muted-foreground text-sm">{dsl.rows.length ? 'Tidak ada DS yang cocok dengan pencarian.' : 'Belum ada DS. Buat yang pertama di atas.'}</div>}
+
+      <div className="mb-4"><Pagination {...pg} /></div>
+
       <SuperAdmins admins={rs.rows.filter((r) => r.peran === 'super_admin')} reload={rs.reload} />
     </div>
   )
 }
 
-function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; reload: () => void }) {
+function DsCard({ d, riders, candidates, kandidatArcon, semuaDs, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; kandidatArcon: Rider[]; semuaDs: Ds[]; reload: () => void }) {
+  const [arPick, setArPick] = useState('')
+  const [arEmail, setArEmail] = useState('')
+  const [arPw, setArPw] = useState('')
+  const arc = riders.find((r) => r.id === d.arcon_id)
+  const jmlDsArcon = arc ? semuaDs.filter((x) => x.arcon_id === arc.id).length : 0
+  const kurangArcon = !arPick ? 'Pilih rider dulu' : !arEmail.trim() ? 'Isi email untuk login' : arPw && arPw.length < 8 ? 'Password minimal 8 karakter' : ''
+  const tunjukArcon = async () => {
+    if (!(await ok(sb.rpc('set_arcon', { p_ds: d.id, p_rider: arPick, p_email: arEmail })))) return
+    if (arPw) await buatAkun(arEmail, arPw)
+    setArPick('')
+    setArEmail('')
+    setArPw('')
+    toast.ok('Arcon berhasil dipilih')
+    reload()
+  }
+  const lepasArcon = async () => {
+    if (confirm(`Lepas ${arc?.nama} dari ${d.nama}? Beliau tetap memegang DS lain kalau ada.`) && (await ok(sb.rpc('lepas_arcon', { p_ds: d.id })))) {
+      toast.ok('Arcon dilepas dari DS ini')
+      reload()
+    }
+  }
   const [f, setF] = useState({ nama: d.nama, kuota_pagi: d.kuota_pagi, kuota_siang: d.kuota_siang, group_wa_id: d.group_wa_id ?? '' })
   const [pick, setPick] = useState('')
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const cap = riders.find((r) => r.id === d.captain_id)
+  const berubah = f.nama.trim() !== d.nama || f.kuota_pagi !== d.kuota_pagi || f.kuota_siang !== d.kuota_siang || f.group_wa_id !== (d.group_wa_id ?? '')
+  const angka = (v: string) => Math.max(0, Math.floor(+v || 0))
+
+  const kurang = !pick ? 'Pilih rider dulu' : !email.trim() ? 'Isi email untuk login' : pw && pw.length < 8 ? 'Password minimal 8 karakter' : ''
 
   const simpan = async () => {
-    if (await ok(sb.from('ds').update({ nama: f.nama.trim(), kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang, group_wa_id: f.group_wa_id || null }).eq('id', d.id))) reload()
+    if (await ok(sb.from('ds').update({ nama: f.nama.trim(), kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang, group_wa_id: f.group_wa_id.trim() || null }).eq('id', d.id))) {
+      toast.ok('Perubahan DS disimpan')
+      reload()
+    }
   }
   const tunjuk = async () => {
     if (!(await ok(sb.rpc('tunjuk_captain', { p_ds: d.id, p_rider: pick, p_email: email })))) return
     if (pw) await buatAkun(email, pw)
-    setPick(''); setEmail(''); setPw('')
+    setPick('')
+    setEmail('')
+    setPw('')
+    toast.ok('Captain berhasil dipilih')
     reload()
   }
 
   return (
     <div className="card">
-      <div className="flex flex-wrap gap-2 items-center mb-2">
-        <input className="inp" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
-        <label className="text-sm">Pagi <input type="number" min={0} className="inp w-16" value={f.kuota_pagi} onChange={(e) => setF({ ...f, kuota_pagi: +e.target.value })} /></label>
-        <label className="text-sm">Siang <input type="number" min={0} className="inp w-16" value={f.kuota_siang} onChange={(e) => setF({ ...f, kuota_siang: +e.target.value })} /></label>
-        <input className="inp" placeholder="Group ID WhatsApp" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} />
-        <button className="btn" onClick={simpan}>Simpan</button>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <h3 className="text-lg font-bold mr-1">{d.nama}</h3>
+        <span className="badge bg-muted text-muted-foreground">
+          Kuota: {d.kuota_pagi} pagi + {d.kuota_siang} siang = {d.kuota_pagi + d.kuota_siang} rider per hari
+        </span>
+        {cap ? <span className="badge bg-primary-soft text-primary-soft-foreground">Captain: {cap.nama}</span> : <span className="badge bg-warning-soft text-warning">Belum ada Captain</span>}
+        {arc && <span className="badge bg-muted text-foreground/80">Arcon: {arc.nama}</span>}
       </div>
-      <p className="text-sm mb-2">
-        Captain: <b>{cap ? `${cap.nama} (${cap.email})` : 'belum ditunjuk'}</b>
-      </p>
-      <div className="flex flex-wrap gap-2 items-center">
-        <RiderPick riders={candidates} value={pick} onChange={setPick} placeholder="Tunjuk Captain" />
-        <input className="inp" placeholder="Email Captain" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className="inp" type="password" placeholder="Password (min 8, opsional)" value={pw} onChange={(e) => setPw(e.target.value)} />
-        <button className="btn2" disabled={!pick || !email.trim() || (!!pw && pw.length < 8)} onClick={tunjuk}>Tunjuk</button>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-start">
+        <Field label="Nama DS" hint="Dipakai di file CSV rider dan di laporan.">
+          <input className="inp w-full" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
+        </Field>
+        <Field label="Kuota shift pagi" hint="Jumlah rider yang harus masuk shift pagi setiap hari.">
+          <input type="number" min={0} className="inp w-full" value={f.kuota_pagi} onChange={(e) => setF({ ...f, kuota_pagi: angka(e.target.value) })} />
+        </Field>
+        <Field label="Kuota shift siang" hint="Jumlah rider yang harus masuk shift siang setiap hari.">
+          <input type="number" min={0} className="inp w-full" value={f.kuota_siang} onChange={(e) => setF({ ...f, kuota_siang: angka(e.target.value) })} />
+        </Field>
+        <Field label="ID grup WhatsApp (opsional)" hint="Untuk pengingat jadwal ke grup nanti. Boleh dikosongkan.">
+          <input className="inp w-full" placeholder="Contoh: 1203630xxxx@g.us" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} />
+        </Field>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button className="btn" disabled={!berubah || !f.nama.trim()} onClick={simpan}>Simpan perubahan</button>
+        {!berubah && <span className="text-xs text-muted-foreground">Belum ada yang diubah</span>}
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border">
+        <b className="block">{cap ? 'Ganti Captain' : 'Tunjuk Captain'}</b>
+        <p className="text-sm text-muted-foreground mb-3">
+          {cap ? <>Captain sekarang: <b className="text-foreground">{cap.nama}</b> ({cap.email}). </> : ''}
+          Captain menyusun jadwal dan mengisi absensi hanya untuk DS ini.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+          <Field label="Rider yang jadi Captain" hint="Ketik nama untuk mencari, lalu pilih dari daftar.">
+            <RiderPick riders={candidates} value={pick} onChange={setPick} placeholder="— pilih rider —" />
+          </Field>
+          <Field label="Email untuk login" hint="Captain memakai email ini untuk masuk ke aplikasi.">
+            <input className="inp w-full" type="email" placeholder="nama@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
+            <input className="inp w-full" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+          </Field>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button className="btn2" disabled={!!kurang} onClick={tunjuk}>{cap ? 'Ganti Captain' : 'Jadikan Captain'}</button>
+          {kurang && <span className="text-xs text-muted-foreground">{kurang}</span>}
+        </div>
+      </div>
+
+      <div className="mt-5 pt-4 border-t border-border">
+        <b className="block">{arc ? 'Ganti Arcon' : 'Tunjuk Arcon (opsional)'}</b>
+        <p className="text-sm text-muted-foreground mb-3">
+          Arcon adalah atasan Captain yang memantau beberapa DS sekaligus. Satu Arcon bisa dipilih di banyak DS. Arcon hanya memantau (dashboard, rider, jadwal, laporan) dan bisa mengunci absensi mingguan.{' '}
+          {arc && <>Arcon sekarang: <b className="text-foreground">{arc.nama}</b> ({arc.email}), memegang {jmlDsArcon} DS.</>}
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+          <Field label="Rider yang jadi Arcon" hint="Pilih rider yang bukan Captain. Rider yang sudah jadi Arcon di DS lain juga bisa dipilih lagi.">
+            <RiderPick riders={kandidatArcon} value={arPick} onChange={setArPick} placeholder="— pilih rider —" />
+          </Field>
+          <Field label="Email untuk login" hint="Arcon memakai email ini untuk masuk ke aplikasi.">
+            <input className="inp w-full" type="email" placeholder="nama@email.com" value={arEmail} onChange={(e) => setArEmail(e.target.value)} />
+          </Field>
+          <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
+            <input className="inp w-full" type="password" autoComplete="new-password" value={arPw} onChange={(e) => setArPw(e.target.value)} />
+          </Field>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button className="btn2" disabled={!!kurangArcon} onClick={tunjukArcon}>{arc ? 'Ganti Arcon' : 'Jadikan Arcon'}</button>
+          {arc && <button className="btn2 !text-danger" onClick={lepasArcon}>Lepas Arcon dari DS ini</button>}
+          {kurangArcon && <span className="text-xs text-muted-foreground">{kurangArcon}</span>}
+        </div>
       </div>
     </div>
   )
@@ -91,30 +218,43 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
 
 function SuperAdmins({ admins, reload }: { admins: Rider[]; reload: () => void }) {
   const [f, setF] = useState({ nama: '', email: '', pw: '' })
+  const kurang = !f.nama.trim() ? 'Isi nama dulu' : !f.email.trim() ? 'Isi email untuk login' : f.pw && f.pw.length < 8 ? 'Password minimal 8 karakter' : ''
   return (
     <div className="card">
-      <b className="block mb-2">Super-admin</b>
-      <ul className="text-sm mb-3">
+      <b className="block">Super-admin</b>
+      <p className="text-sm text-muted-foreground mb-3">Super-admin bisa melihat semua DS dan mengatur sistem. Jumlahnya boleh lebih dari satu.</p>
+      <ul className="flex flex-wrap gap-2 mb-5">
         {admins.map((a) => (
-          <li key={a.id}>{a.nama} — {a.email}</li>
+          <li key={a.id} className="badge bg-primary-soft text-primary-soft-foreground !text-sm !px-3 !py-1">{a.nama} · {a.email}</li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-2">
-        <input className="inp" placeholder="Nama" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
-        <input className="inp" placeholder="Email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
-        <input className="inp" type="password" placeholder="Password (min 8, opsional)" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} />
+      <b className="block text-sm mb-3">Tambah Super-admin baru</b>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+        <Field label="Nama" hint="Nama lengkap orangnya.">
+          <input className="inp w-full" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
+        </Field>
+        <Field label="Email untuk login" hint="Dipakai untuk masuk ke aplikasi.">
+          <input className="inp w-full" type="email" placeholder="nama@email.com" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+        </Field>
+        <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
+          <input className="inp w-full" type="password" autoComplete="new-password" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} />
+        </Field>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
         <button
           className="btn2"
-          disabled={!f.nama.trim() || !f.email.trim() || (!!f.pw && f.pw.length < 8)}
+          disabled={!!kurang}
           onClick={async () => {
             if (!(await ok(sb.from('riders').insert({ nama: f.nama.trim(), email: f.email, peran: 'super_admin' })))) return
             if (f.pw) await buatAkun(f.email, f.pw)
             setF({ nama: '', email: '', pw: '' })
+            toast.ok('Super-admin ditambahkan')
             reload()
           }}
         >
           Tambah Super-admin
         </button>
+        {kurang && <span className="text-xs text-muted-foreground">{kurang}</span>}
       </div>
     </div>
   )
