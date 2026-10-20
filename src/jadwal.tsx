@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CalendarOff, Copy, FileText, Image as ImageIcon, Lock, Sparkles, Sun, Sunrise } from 'lucide-react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, type Ds, type Me, type Rider } from './lib'
 import { bagiCadangan, buatDraf, cadanganDisarankan, hitungRiwayat, polaAbsen, ringkasanKeadilan, type KuotaHari, type PolaHari, type StatRider } from './otomatis'
 import { Cetak } from './unduh'
 
@@ -128,7 +128,6 @@ function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string,
   const baris = riders.map((r) => ({ r, s: stat[r.id] })).sort((a, b) => b.s.hk - a.s.hk || a.r.nama.localeCompare(b.r.nama))
   const hk = baris.map((b) => b.s.hk)
   const we = baris.map((b) => b.s.akhirPekan)
-  const pg = usePage(baris, [riders.length + '|' + hk.join(',') + '|' + we.join(',')])
   const kisaran = (a: number[]) => (a.length ? `${Math.min(...a)}–${Math.max(...a)}` : '–')
   const selisih = (a: number[]) => (a.length ? Math.max(...a) - Math.min(...a) : 0)
   return (
@@ -144,7 +143,7 @@ function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string,
           <table className="tbl">
             <thead><tr><th>Rider</th><th>Hari kerja</th><th>Pagi</th><th>Siang</th><th>Akhir pekan</th><th>Libur</th></tr></thead>
             <tbody>
-              {pg.rows.map(({ r, s }) => (
+              {baris.map(({ r, s }) => (
                 <tr key={r.id}>
                   <td>{r.nama} <span className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</span></td>
                   <td className="font-mono font-semibold">{s.hk}</td><td className="font-mono">{s.pagi}</td><td className="font-mono">{s.siang}</td>
@@ -154,7 +153,6 @@ function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string,
             </tbody>
           </table>
         </div>
-        <Pagination {...pg} />
       </div>
     </details>
   )
@@ -229,7 +227,6 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const kq = (d: string): Kq => kuota[d] ?? { pagi: ds.kuota_pagi, siang: ds.kuota_siang, cadangan: 0 }
   const cnt = (d: string, s: string) => riders.rows.filter((r) => g[`${r.id}|${d}`] === s).length
   const shown = riders.rows.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
-  const pg = usePage(shown, [q, ds.id, dari, sampai])
   const adaIsi = days.some((d) => riders.rows.some((r) => kerjaShift(g[`${r.id}|${d}`])))
   const stat = ringkasanKeadilan(g, riders.rows.map((r) => r.id), days)
   // lebih dari 6 hari kerja dalam satu minggu Senin–Minggu → tandai merah
@@ -401,7 +398,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {pg.rows.map((r) => {
+            {shown.map((r) => {
               const kerja = days.filter((d) => kerjaShift(g[`${r.id}|${d}`])).length
               return (
                 <tr key={r.id} className="group">
@@ -430,7 +427,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                 </tr>
               )
             })}
-            {!pg.rows.length && (
+            {!shown.length && (
               <tr><td colSpan={days.length + 2} className="px-4 py-10 text-center text-muted-foreground">{riders.rows.length ? 'Tidak ada rider yang cocok dengan pencarian.' : 'Belum ada rider aktif di DS ini.'}</td></tr>
             )}
           </tbody>
@@ -450,7 +447,6 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
           </tfoot>
         </table>
         </div>
-        <Pagination {...pg} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         {editable && (
