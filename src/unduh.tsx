@@ -6,9 +6,8 @@ export type DataCetak = {
   judul: string
   days: string[]
   riders: { id: string; nama: string; kode_mtr: string | null }[]
-  g: Record<string, string> // "riderId|tanggal" -> pagi | siang
-  kuotaPagi: number
-  kuotaSiang: number
+  g: Record<string, string> // "riderId|tanggal" -> pagi | siang | off (libur terkunci)
+  kuota: Record<string, { pagi: number; siang: number; cadangan: number }> // kebutuhan client per tanggal
 }
 
 const NAMA_HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
@@ -19,10 +18,17 @@ const tanggalPanjang = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateStr
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 const potong = <T,>(l: T[], n: number) => (l.length ? Array.from({ length: Math.ceil(l.length / n) }, (_, i) => l.slice(i * n, (i + 1) * n)) : [[] as T[]])
 
-const warnaKuota = (n: number, q: number) => (n === q ? 'text-success' : n < q ? 'text-warning' : 'text-danger')
+// Hijau = pas, kuning = kurang; kelebihan: biru bila masih dalam jatah cadangan, merah bila melebihi
+const warnaKuota = (n: number, q: number, lebihTotal: number, cad: number) => (n === q ? 'text-success' : n < q ? 'text-warning' : lebihTotal <= cad ? 'text-primary' : 'text-danger')
 
 function Sel({ v, padat }: { v: string; padat: boolean }) {
   if (!v) return <span className="text-muted-foreground/40">·</span>
+  if (v === 'off')
+    return padat ? (
+      <span className="inline-flex size-6 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground">L</span>
+    ) : (
+      <span className="inline-block w-[4.5rem] rounded-lg border border-border bg-muted px-2 py-1.5 text-xs font-semibold text-muted-foreground">Libur</span>
+    )
   const pagi = v === 'pagi'
   if (padat)
     return <span className={`inline-flex size-6 items-center justify-center rounded text-[11px] font-bold ${pagi ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary-soft-foreground'}`}>{pagi ? 'P' : 'S'}</span>
@@ -106,6 +112,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
           <div className="mb-3 mt-3 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><Sel v="pagi" padat={false} /> shift pagi</span>
             <span className="flex items-center gap-1.5"><Sel v="siang" padat={false} /> shift siang</span>
+            <span className="flex items-center gap-1.5"><Sel v="off" padat={false} /> libur terkunci (cuti/izin)</span>
             <span className="flex items-center gap-1.5"><Sel v="" padat={false} /> libur</span>
           </div>
 
@@ -143,7 +150,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
                       <Sel v={g[`${r.id}|${d}`] ?? ''} padat={padat} />
                     </td>
                   ))}
-                  <td className="text-center font-mono font-semibold">{days.filter((d) => g[`${r.id}|${d}`]).length}</td>
+                  <td className="text-center font-mono font-semibold">{days.filter((d) => ['pagi', 'siang'].includes(g[`${r.id}|${d}`])).length}</td>
                 </tr>
               ))}
               {!rows.length && (
@@ -153,16 +160,19 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
             <tfoot>
               <tr className="bg-muted">
                 <td className="py-2 pl-2 text-xs font-semibold">
-                  Jumlah rider / kuota
-                  <div className="text-[10px] font-normal text-muted-foreground">Kuota: {data.kuotaPagi} pagi, {data.kuotaSiang} siang per hari</div>
+                  Terisi / kebutuhan client
+                  <div className="text-[10px] font-normal text-muted-foreground">Kebutuhan bisa berbeda tiap hari; +cad = rider cadangan</div>
                 </td>
                 {days.map((d) => {
                   const p = hitung(d, 'pagi')
                   const s = hitung(d, 'siang')
+                  const k = data.kuota[d] ?? { pagi: 0, siang: 0, cadangan: 0 }
+                  const lebih = Math.max(0, p - k.pagi) + Math.max(0, s - k.siang)
                   return (
                     <td key={d} className="py-1.5 text-center font-mono text-[10px] font-semibold leading-snug">
-                      <div className={warnaKuota(p, data.kuotaPagi)}>{padat ? `P${p}` : `P ${p}/${data.kuotaPagi}`}</div>
-                      <div className={warnaKuota(s, data.kuotaSiang)}>{padat ? `S${s}` : `S ${s}/${data.kuotaSiang}`}</div>
+                      <div className={warnaKuota(p, k.pagi, lebih, k.cadangan)}>{padat ? `P${p}` : `P ${p}/${k.pagi}`}</div>
+                      <div className={warnaKuota(s, k.siang, lebih, k.cadangan)}>{padat ? `S${s}` : `S ${s}/${k.siang}`}</div>
+                      {k.cadangan > 0 && !padat && <div className="text-[9px] font-normal text-muted-foreground">+{k.cadangan} cad</div>}
                     </td>
                   )
                 })}
