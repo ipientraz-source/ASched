@@ -67,19 +67,16 @@ export function Pengguna() {
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead>
-              <tr><th>Nama</th><th>Peran</th><th>Email</th><th>DS yang dipegang</th><th>Status</th></tr>
+              <tr><th>Nama</th><th>Peran</th><th>Email / ID Driver</th><th>DS yang dipegang</th><th>Status</th></tr>
             </thead>
             <tbody>
               {pg.rows.map((r) => {
                 const ds = dipegang(r)
                 return (
                   <tr key={r.id}>
-                    <td>
-                      <div className="font-medium">{r.nama}</div>
-                      <div className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr ?? '—'}</div>
-                    </td>
+                    <td className="font-medium">{r.nama}</td>
                     <td><span className={`badge ${PERAN[r.peran].gaya}`} title={PERAN[r.peran].ket}>{PERAN[r.peran].label}</span></td>
-                    <td className="text-muted-foreground">{r.email ?? '—'}</td>
+                    <td className={r.email ? 'text-muted-foreground' : 'font-mono text-xs text-muted-foreground'}>{r.email ?? r.kode_mtr ?? '—'}</td>
                     <td>
                       {r.peran === 'super_admin' ? <span className="text-muted-foreground">Semua DS</span>
                         : ds.length ? <div className="flex flex-wrap gap-1">{ds.map((n) => <span key={n} className="badge bg-muted text-foreground/80">{n}</span>)}</div>
