@@ -275,8 +275,8 @@ function PanelPola({ pola, ds }: { pola: PolaHari[] | null; ds: Ds }) {
 }
 
 // Grid jadwal 1 DS untuk periode bebas. editable = Captain / Super-admin; read-only = Arcon (dan Super-admin di tampilan lihat).
-export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
-  const awal = editable ? addDays(monday(today()), 7) : monday(today())
+export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boolean; awalDari?: string }) {
+  const awal = awalDari ?? (editable ? addDays(monday(today()), 7) : monday(today())) // awalDari: dibuka dari Daftar Jadwal
   const [mode, setMode] = useState<Mode>('minggu')
   const [dari, setDari] = useState(awal)
   const [sampai, setSampai] = useState(addDays(awal, 6))

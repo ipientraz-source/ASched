@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, ShieldCheck, TrendingUp, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, ListChecks, LogOut, ShieldCheck, TrendingUp, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { sb, store, useRows, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
 import { RiderApp, JadwalSaya } from './rider'
 import { AbsensiSemua, Daily } from './daily'
@@ -9,6 +9,7 @@ import { Dashboard, Rekap } from './rekap'
 import { DataRider } from './riders'
 import { Kelola } from './kelola'
 import { Pengguna } from './pengguna'
+import { DaftarJadwal } from './daftarjadwal'
 
 type P = { me: Me; ds: Ds | null; dsList: Ds[] } // ds = DS Captain; dsList = semua DS yang dipegang Arcon
 type Tab = { nama: string; desc: string; Icon: LucideIcon; View: (p: P) => ReactElement }
@@ -17,6 +18,7 @@ const SUPER: Tab[] = [
   { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di semua DS', Icon: LayoutDashboard, View: () => <Dashboard /> },
   { nama: 'Data Rider', desc: 'Atur rider: pindahkan ke DS lain, ubah status aktif/nonaktif, import dan unduh CSV', Icon: Users, View: DataRider },
   { nama: 'Jadwal', desc: 'Lihat dan susun jadwal DS mana pun. Biasanya disusun Captain; Super-admin bisa membantu kapan saja.', Icon: CalendarDays, View: () => <JadwalSemua editable /> },
+  { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS per minggu. Hanya Super-admin dan Arcon yang bisa melihatnya.', Icon: ListChecks, View: () => <DaftarJadwal /> },
   { nama: 'Absensi Harian', desc: 'Isi atau koreksi absensi rider di DS mana pun', Icon: ClipboardCheck, View: () => <AbsensiSemua /> },
   { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
   { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota rider, pilih Captain, dan tambah Super-admin', Icon: Building2, View: () => <Kelola /> },
@@ -34,6 +36,7 @@ const ARCON: Tab[] = [
   { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di DS yang Anda pegang', Icon: LayoutDashboard, View: () => <Dashboard /> },
   { nama: 'Data Rider', desc: 'Lihat rider di DS yang Anda pegang', Icon: Users, View: DataRider },
   { nama: 'Jadwal', desc: 'Lihat jadwal DS yang Anda pegang. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: ({ dsList }) => <JadwalSemua daftar={dsList} /> },
+  { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS yang Anda pegang, per minggu', Icon: ListChecks, View: () => <DaftarJadwal /> },
   { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya dan kunci absensi mingguan di DS Anda', Icon: ClipboardList, View: Rekap },
 ]
 const RIDER: Tab[] = [{ nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda', Icon: CalendarCheck, View: JadwalSaya }]

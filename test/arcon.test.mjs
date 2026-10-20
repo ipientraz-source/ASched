@@ -96,6 +96,24 @@ test('Status Arcon dan Captain hanya bisa diubah Super-admin; Captain tetap bisa
   assert.equal((await q("select count(*)::int n from riders where status = 'nonaktif'"))[0].n, 0)
 })
 
+test('Daftar jadwal semua DS: Super-admin melihat semua, Arcon hanya DS yang dipegang, Captain/rider/anon ditolak', async () => {
+  const daftar = () => q("select ds_nama, rider, shift, libur_kunci from ringkasan_jadwal(today_wib() - 7, today_wib() + 7) order by ds_nama")
+  await as(S, async () => {
+    const r = await daftar()
+    assert.deepEqual(r.map((x) => x.ds_nama), ['Alam Sutera', 'Galaxy', 'Gowa'])
+    assert.deepEqual(r.map((x) => [x.rider, x.shift, x.libur_kunci]), [[1, 1, 0], [1, 1, 0], [1, 1, 0]])
+  })
+  await as(AA, async () => assert.deepEqual((await daftar()).map((x) => x.ds_nama), ['Alam Sutera', 'Galaxy'])) // Gowa bukan miliknya
+  await as(AB, async () => assert.deepEqual((await daftar()).map((x) => x.ds_nama), ['Gowa']))
+  await as(CG, async () => {
+    await assert.rejects(daftar(), /Hanya Super-admin dan Arcon/)
+    const j = await q('select distinct ds_id from jadwal') // Captain hanya membaca jadwal DS yang dia pegang
+    assert.deepEqual(j.map((x) => x.ds_id), [GALAXY])
+  })
+  await as(null, async () => await assert.rejects(daftar(), /permission denied|Hanya Super-admin dan Arcon/))
+  await as(S, async () => await assert.rejects(q('select * from ringkasan_jadwal(today_wib(), today_wib() - 1)'), /Rentang tanggal tidak valid/))
+})
+
 test('Arcon hanya memantau: tidak bisa menyusun jadwal, mengisi absensi, tarik rider, atau menulis langsung', async () => {
   await as(AA, async () => {
     await assert.rejects(q("select catat_actual(today_wib(), $1::uuid, 'hadir')", [R_G]), /Hanya Captain/)
