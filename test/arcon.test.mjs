@@ -102,6 +102,63 @@ test('Arcon bisa mengunci absensi mingguan DS yang dipegang, bukan DS lain', asy
   })
 })
 
+test('Super-admin bisa menyusun jadwal DS mana pun (tercatat di log); Arcon dan Captain DS lain tetap tidak bisa', async () => {
+  const tgl = (await q('select today_wib()::text t'))[0].t
+  const baris = JSON.stringify([{ tanggal: tgl, rider_id: R_G, shift: 'siang' }])
+  await as(S, async () => {
+    const n = await q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb) n', [GALAXY, baris])
+    assert.equal(n[0].n, 1)
+    assert.equal((await q('select shift from jadwal where rider_id = $1 and tanggal = $2', [R_G, tgl]))[0].shift, 'siang')
+    // DS lain juga boleh, dan jejaknya atas nama Super-admin
+    await q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GOWA, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'siang' }])])
+    const log = await q("select captain_id, detail from log_aktivitas where aksi = 'ubah jadwal' and captain_id = $1", [id(1)])
+    assert.equal(log.length, 2)
+    assert.match(log[0].detail, /Galaxy|Gowa/)
+    // validasi tetap berlaku: rider DS lain ditolak
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'pagi' }])]), /bukan anggota DS/)
+  })
+  await as(AA, async () => {
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, baris]), /Hanya Captain DS ini atau Super-admin/)
+  })
+  await as(CG, async () => {
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GOWA, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'pagi' }])]), /Hanya Captain DS ini atau Super-admin/)
+    await q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, baris]) // DS sendiri tetap boleh
+  })
+})
+
+test('Super-admin akses penuh absensi: isi, koreksi, hapus di DS mana pun; kunci tetap menolak sampai dibuka Super-admin', async () => {
+  const w = (await q(`select (date_trunc('week', today_wib()) - interval '7 days')::date::text w`))[0].w
+  await as(S, async () => {
+    await q("select catat_actual($1::date, $2::uuid, 'alpha', null, 'dadakan')", [w, R_W]) // rider Gowa, tanpa jadi Captain Gowa
+    const a = (await q('select ds_id, diinput_oleh, status from actual_harian where rider_id = $1 and tanggal = $2', [R_W, w]))[0]
+    assert.deepEqual([a.ds_id, a.diinput_oleh, a.status], [GOWA, id(1), 'alpha']) // DS diturunkan dari rider; jejak atas nama Super-admin
+    await q("select catat_actual($1::date, $2::uuid, 'hadir')", [w, R_W]) // koreksi
+    assert.equal((await q('select status from actual_harian where rider_id = $1 and tanggal = $2', [R_W, w]))[0].status, 'hadir')
+    await assert.rejects(q("select catat_actual(today_wib(), $1::uuid, 'hadir')", [id(24)]), /belum punya DS/) // rider tanpa DS: pesan jelas
+    // kunci periode tetap berlaku untuk siapa pun, termasuk Super-admin
+    await q('select kunci_periode($1::uuid, $2::date)', [GOWA, w])
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'alpha')", [w, R_W]), /sudah dikunci/)
+    // Super-admin membuka kunci → koreksi boleh lagi, dan pembukaan tercatat
+    await q('select buka_kunci($1::uuid, $2::date)', [GOWA, w])
+    await assert.rejects(q('select buka_kunci($1::uuid, $2::date)', [GOWA, w]), /tidak sedang dikunci/)
+    await q("select catat_actual($1::date, $2::uuid, 'izin', null, 'ke dokter')", [w, R_W])
+    const b = (await q('select status, periode_terkunci from actual_harian where rider_id = $1 and tanggal = $2', [R_W, w]))[0]
+    assert.deepEqual([b.status, b.periode_terkunci], ['izin', false])
+    await q('select hapus_actual($1::date, $2::uuid)', [w, R_W])
+    assert.equal((await q('select * from actual_harian where rider_id = $1 and tanggal = $2', [R_W, w])).length, 0)
+    assert.equal((await q("select * from log_aktivitas where aksi = 'buka kunci' and captain_id = $1", [id(1)])).length, 1)
+  })
+  await as(AA, async () => {
+    await assert.rejects(q('select buka_kunci($1::uuid, $2::date)', [GALAXY, w]), /Hanya Super-admin/) // Arcon boleh mengunci, bukan membuka
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'hadir')", [w, R_G]), /Hanya Captain/)
+    await assert.rejects(q('select hapus_actual($1::date, $2::uuid)', [w, R_G]), /Hanya Captain/)
+  })
+  await as(CG, async () => {
+    await assert.rejects(q('select buka_kunci($1::uuid, $2::date)', [GALAXY, w]), /Hanya Super-admin/)
+    await assert.rejects(q("select catat_actual($1::date, $2::uuid, 'hadir')", [w, R_W]), /bukan anggota DS Anda/) // rider DS lain
+  })
+})
+
 test('Super-admin menunjuk Arcon: satu Arcon banyak DS; Captain tak bisa merangkap; Arcon lama diturunkan', async () => {
   await as(S, async () => {
     await assert.rejects(q("select set_arcon($1::uuid, $2::uuid, 'x@y.z')", [GALAXY, R_CG]), /Captain/) // Captain tak bisa jadi Arcon

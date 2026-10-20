@@ -299,8 +299,8 @@ export function JadwalDs({ ds }: { me: Me; ds: Ds | null }) {
   return ds ? <JadwalGrid key={ds.id} ds={ds} editable /> : <p>Anda belum ditunjuk sebagai Captain di DS mana pun.</p>
 }
 
-// Super-admin / Arcon: lihat jadwal DS (read-only — penyusunan sepenuhnya di Captain)
-export function JadwalSemua({ daftar }: { daftar?: Ds[] }) {
+// Super-admin (editable, akses penuh) / Arcon (hanya lihat): jadwal DS mana pun
+export function JadwalSemua({ daftar, editable = false }: { daftar?: Ds[]; editable?: boolean }) {
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
   const rows = daftar ?? dsl.rows // Arcon: hanya DS yang dipegang; Super-admin: semua DS
   const [id, setId] = useState('')
@@ -308,7 +308,7 @@ export function JadwalSemua({ daftar }: { daftar?: Ds[] }) {
   return (
     <div>
       <Select className="mb-3 w-72 max-w-full" value={ds?.id ?? ''} onChange={setId} placeholder="Pilih DS" opsi={rows.map((d) => ({ value: d.id, label: d.nama }))} />
-      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
+      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={editable} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
     </div>
   )
 }
