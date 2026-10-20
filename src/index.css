@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@layer components {
+  .inp { @apply border border-slate-300 rounded px-2 py-1 text-sm bg-white; }
+  .btn { @apply bg-slate-800 text-white rounded px-3 py-1 text-sm hover:bg-slate-700 disabled:opacity-40; }
+  .btn2 { @apply border border-slate-300 rounded px-3 py-1 text-sm bg-white hover:bg-slate-100 disabled:opacity-40; }
+  .tbl { @apply w-full text-sm border-collapse bg-white; }
+  .tbl th { @apply text-left bg-slate-100 px-2 py-1 font-medium whitespace-nowrap; }
+  .tbl td { @apply border-t border-slate-200 px-2 py-1; }
+  .card { @apply bg-white border border-slate-200 rounded p-3 mb-4; }
+}
