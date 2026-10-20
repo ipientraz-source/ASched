@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { UserCheck, UserMinus, Users } from 'lucide-react'
-import { sb, useRows, ok, toast, Err, Kosong, Stat, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -97,17 +97,28 @@ function TambahRider({ dsl, done }: { dsl: Ds[]; done: () => void }) {
   const [f, setF] = useState({ kode_mtr: '', nama: '', no_hp: '', ds_id: '' })
   return (
     <div className="card">
-      <b className="block mb-2">Tambah satu rider</b>
-      <div className="flex flex-wrap gap-2">
-        <input className="inp" placeholder="Kode MTR" value={f.kode_mtr} onChange={(e) => setF({ ...f, kode_mtr: e.target.value })} />
-        <input className="inp" placeholder="Nama" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
-        <input className="inp" placeholder="No HP" value={f.no_hp} onChange={(e) => setF({ ...f, no_hp: e.target.value })} />
-        <select className="inp" value={f.ds_id} onChange={(e) => setF({ ...f, ds_id: e.target.value })}>
-          <option value="">— belum punya DS —</option>
-          {dsl.map((d) => (
-            <option key={d.id} value={d.id}>{d.nama}</option>
-          ))}
-        </select>
+      <b className="block">Tambah satu rider</b>
+      <p className="text-sm text-muted-foreground mb-3">Untuk menambah rider satu per satu. Kalau banyak, pakai Import CSV di atas.</p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-start">
+        <Field label="Kode MTR (wajib)" hint="Kode unik rider. Dipakai rider untuk login dan tidak boleh kembar.">
+          <input className="inp w-full" placeholder="Contoh: MTR001" value={f.kode_mtr} onChange={(e) => setF({ ...f, kode_mtr: e.target.value })} />
+        </Field>
+        <Field label="Nama rider (wajib)" hint="Nama lengkap sesuai identitas.">
+          <input className="inp w-full" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
+        </Field>
+        <Field label="Nomor HP" hint="Boleh dikosongkan.">
+          <input className="inp w-full" placeholder="Contoh: 08123456789" value={f.no_hp} onChange={(e) => setF({ ...f, no_hp: e.target.value })} />
+        </Field>
+        <Field label="DS" hint="DS tempat rider bekerja. Kalau belum jelas, biarkan dulu — Captain bisa menariknya nanti.">
+          <select className="inp w-full" value={f.ds_id} onChange={(e) => setF({ ...f, ds_id: e.target.value })}>
+            <option value="">— belum punya DS —</option>
+            {dsl.map((d) => (
+              <option key={d.id} value={d.id}>{d.nama}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="mt-3">
         <button
           className="btn"
           disabled={!f.kode_mtr.trim() || !f.nama.trim()}
@@ -118,7 +129,7 @@ function TambahRider({ dsl, done }: { dsl: Ds[]; done: () => void }) {
             }
           }}
         >
-          Tambah
+          Tambah rider
         </button>
       </div>
     </div>

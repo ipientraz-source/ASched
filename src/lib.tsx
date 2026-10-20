@@ -226,7 +226,7 @@ export function RiderPick({
   const f = riders.filter((r) => (r.nama + ' ' + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase())).slice(0, 50)
   return (
     <span className="inline-flex gap-1">
-      <input className="inp w-24" placeholder="cari…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="inp w-28" placeholder="ketik nama…" value={q} onChange={(e) => setQ(e.target.value)} />
       <select className="inp" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{placeholder ?? '— pilih —'}</option>
         {f.map((r) => (
@@ -242,6 +242,15 @@ export function RiderPick({
 
 export const Err = ({ msg }: { msg: string }) =>
   msg ? <p className="text-danger text-sm mb-3 bg-danger-soft border border-danger/30 rounded-md px-3 py-2">{msg}</p> : null
+
+// Kolom isian berlabel + penjelasan fungsinya, supaya jelas untuk apa tiap kolom
+export const Field = ({ label, hint, children, className = '' }: { label: string; hint?: string; children: ReactNode; className?: string }) => (
+  <div className={className}>
+    <label className="lbl">{label}</label>
+    {children}
+    {hint && <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{hint}</p>}
+  </div>
+)
 
 export const Logo = ({ small }: { small?: boolean }) => (
   <div className={`${small ? 'size-9 text-base' : 'size-12 text-xl'} shrink-0 rounded-xl bg-primary text-white font-display font-bold flex items-center justify-center shadow-lg shadow-primary/30`}>D</div>
