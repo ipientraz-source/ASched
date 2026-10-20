@@ -1,43 +1,155 @@
 @import "tailwindcss";
 
-@theme {
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — tiga lapis: Primitive → Semantic → Component
+   Komponen TIDAK boleh memakai warna mentah (zinc-*, #hex); pakai token semantic.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 1. PRIMITIVE: nilai mentah, tanpa makna ── */
+:root {
+  --purple-50: #f5f3ff;  --purple-100: #ede9fe; --purple-300: #c4b5fd; --purple-500: #8b5cf6;
+  --purple-600: #7c3aed; --purple-700: #6d28d9; --purple-800: #5b21b6; --purple-900: #4c1d95;
+
+  --gray-0: #ffffff;   --gray-50: #fafafa;  --gray-100: #f4f4f5; --gray-200: #e4e4e7; --gray-300: #d4d4d8;
+  --gray-400: #a1a1aa; --gray-500: #71717a; --gray-600: #52525b; --gray-800: #27272a; --gray-950: #0c0c0f;
+
+  --red-100: #fee2e2;   --red-400: #f87171;   --red-600: #dc2626;
+  --amber-100: #fef3c7; --amber-400: #fbbf24; --amber-700: #b45309;
+  --green-100: #dcfce7; --green-400: #4ade80; --green-700: #15803d;
+
+  --radius-base: 0.5rem;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+}
+
+/* ── 2. SEMANTIC: makna/tujuan — inilah yang dipakai komponen. Mode gelap cukup menimpa lapis ini. ── */
+:root {
+  color-scheme: light;
+  --background: var(--gray-50);
+  --foreground: var(--gray-950);
+  --card: var(--gray-0);
+  --muted: var(--gray-100);
+  --muted-foreground: var(--gray-500);
+  --border: var(--gray-200);
+  --input: var(--gray-300);
+  --ring: var(--purple-500);
+
+  --primary: var(--purple-600);
+  --primary-hover: var(--purple-700);
+  --primary-active: var(--purple-800);
+  --primary-deep: var(--purple-800);
+  --primary-foreground: var(--gray-0);
+  --primary-soft: var(--purple-50);
+  --primary-soft-foreground: var(--purple-800);
+
+  --danger: var(--red-600);       --danger-soft: var(--red-100);
+  --warning: var(--amber-700);    --warning-soft: var(--amber-100);
+  --success: var(--green-700);    --success-soft: var(--green-100);
+
+  --sidebar: var(--gray-950);
+  --sidebar-foreground: var(--gray-400);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0a0a0d;
+  --foreground: #f4f4f5;
+  --card: #131318;
+  --muted: #1c1c23;
+  --muted-foreground: var(--gray-400);
+  --border: #2a2a33;
+  --input: #3a3a45;
+  --ring: var(--purple-500);
+
+  --primary: var(--purple-600);      /* tetap sama: teks putih di atasnya kontras 5.7:1 */
+  --primary-hover: var(--purple-500);
+  --primary-active: var(--purple-700);
+  --primary-deep: var(--purple-900);
+  --primary-soft: #221a3d;
+  --primary-soft-foreground: var(--purple-300);
+
+  --danger: var(--red-400);       --danger-soft: #3b1518;
+  --warning: var(--amber-400);    --warning-soft: #33250a;
+  --success: var(--green-400);    --success-soft: #0f2a19;
+
+  --sidebar: #07070a;
+  --sidebar-foreground: var(--gray-400);
+}
+
+/* ── 3. COMPONENT: token khusus komponen, merujuk semantic ── */
+:root {
+  --card-radius: 1rem;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  --card-shadow-hover: 0 8px 24px -8px rgb(0 0 0 / 0.18);
+  --control-radius: var(--radius-base);
+  --ring-width: 3px;
+}
+
+/* Daftarkan token semantic ke Tailwind → bisa dipakai sebagai bg-card, text-muted-foreground, dll. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-deep: var(--primary-deep);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+
   --font-sans: 'Manrope', system-ui, sans-serif;
   --font-display: 'Sora', 'Manrope', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --color-brand: #7c3aed;
-  --color-brand-dark: #5b21b6;
-  --color-brand-soft: #f3effe;
-  --color-ink: #111113;
 }
 
 body {
-  @apply bg-zinc-50 text-ink font-sans antialiased;
-  background-image: radial-gradient(60rem 28rem at 100% -8%, rgb(124 58 237 / 0.07), transparent), radial-gradient(40rem 24rem at -10% 110%, rgb(124 58 237 / 0.05), transparent);
+  @apply bg-background text-foreground font-sans antialiased;
+  background-image: radial-gradient(60rem 28rem at 100% -8%, color-mix(in srgb, var(--primary) 7%, transparent), transparent), radial-gradient(40rem 24rem at -10% 110%, color-mix(in srgb, var(--primary) 5%, transparent), transparent);
   background-attachment: fixed;
 }
 h1, h2, h3 { font-family: var(--font-display); }
-::selection { background: rgb(124 58 237 / 0.2); }
+::selection { background: color-mix(in srgb, var(--primary) 25%, transparent); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise 0.28s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } * { transition-duration: 0.01ms !important; } }
 
+/* Komponen — state: default / hover / active / focus-visible / disabled */
 @layer components {
-  .inp { @apply border border-zinc-300 rounded-md px-2.5 py-1.5 text-sm bg-white placeholder:text-zinc-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20; }
-  .btn { @apply bg-brand text-white rounded-md px-3.5 py-1.5 text-sm font-semibold hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
-  .btn2 { @apply border border-zinc-300 rounded-md px-3.5 py-1.5 text-sm font-medium bg-white hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-1.5 text-sm font-semibold transition-colors hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:ring-[length:var(--ring-width)] focus-visible:ring-ring/40 disabled:opacity-40 disabled:cursor-not-allowed; border-radius: var(--control-radius); }
+  .btn2 { @apply inline-flex items-center justify-center gap-1.5 border border-input bg-card text-foreground px-3.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted hover:border-foreground/40 active:bg-border focus-visible:outline-none focus-visible:ring-[length:var(--ring-width)] focus-visible:ring-ring/40 disabled:opacity-40 disabled:cursor-not-allowed; border-radius: var(--control-radius); }
   .btn-lg { @apply min-h-11 px-5 text-base; }
-  .card { @apply bg-white border border-zinc-200 rounded-2xl p-5 mb-4 shadow-sm; }
-  .stat { @apply bg-white border border-zinc-200 rounded-2xl p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-brand/30; }
-  .stat b { @apply block font-mono text-2xl font-bold text-ink; }
-  .stat span { @apply text-xs text-zinc-500; }
-  .lbl { @apply block font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1; }
-  .tbl { @apply w-full text-sm border-collapse bg-white; }
-  .tbl th { @apply text-left px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500 bg-zinc-50 border-b border-zinc-200 whitespace-nowrap; }
-  .tbl td { @apply px-3 py-2 border-b border-zinc-100; }
-  .tbl tbody tr:hover { @apply bg-brand-soft/50; }
+  .inp { @apply border border-input bg-card text-foreground px-2.5 py-1.5 text-sm placeholder:text-muted-foreground/70 transition-colors focus:outline-none focus:border-primary focus:ring-[length:var(--ring-width)] focus:ring-ring/25 disabled:opacity-50; border-radius: var(--control-radius); }
+  .card { @apply bg-card border border-border p-5 mb-4; border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
+  .stat { @apply bg-card border border-border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-primary/30; border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
+  .stat:hover { box-shadow: var(--card-shadow-hover); }
+  .stat b { @apply block font-mono text-2xl font-bold text-foreground; }
+  .stat span { @apply text-xs text-muted-foreground; }
+  .lbl { @apply block font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1; }
+  .tbl { @apply w-full text-sm border-collapse bg-card; }
+  .tbl th { @apply text-left px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/60 border-b border-border whitespace-nowrap; }
+  .tbl td { @apply px-3 py-2 border-b border-border/60; }
+  .tbl tbody tr { @apply transition-colors; }
+  .tbl tbody tr:hover { @apply bg-primary-soft/60; }
   .badge { @apply inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold; }
-  .nav { @apply w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left text-zinc-400 hover:bg-white/10 hover:text-white transition-colors; }
-  .nav-on { @apply bg-brand text-white shadow-lg shadow-brand/30 hover:bg-brand; }
-  .tab { @apply px-3.5 py-1.5 text-sm font-semibold rounded-md text-zinc-600 hover:bg-zinc-100 whitespace-nowrap; }
-  .tab-on { @apply bg-brand text-white hover:bg-brand; }
+  .nav { @apply w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left text-sidebar-foreground transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30; }
+  .nav-on { @apply bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary hover:text-primary-foreground; }
+  .tab { @apply px-3.5 py-1.5 text-sm font-semibold rounded-md text-muted-foreground transition-colors hover:bg-muted whitespace-nowrap; }
+  .tab-on { @apply bg-primary text-primary-foreground hover:bg-primary; }
 }

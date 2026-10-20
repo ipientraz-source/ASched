@@ -36,7 +36,7 @@ function useRange() {
         <option value="bulanan">Bulanan</option>
       </select>
       <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
-      <span className="text-sm text-zinc-600">
+      <span className="text-sm text-muted-foreground">
         {from} s/d {to}
       </span>
     </div>
@@ -59,7 +59,7 @@ function DsTable({ rows }: { rows: DsRow[] }) {
             <tr key={d.ds_id}>
               <td>{d.ds_nama}</td><td>{d.dijadwalkan}</td><td className="font-medium">{pct(d)}</td><td>{d.alpha}</td><td>{d.tukar}</td>
               <td>{d.pengganti}</td><td>{d.belum_diisi}</td>
-              <td className={d.hari_belum_isi ? 'text-red-600 font-medium' : ''}>{d.hari_belum_isi}</td>
+              <td className={d.hari_belum_isi ? 'text-danger font-medium' : ''}>{d.hari_belum_isi}</td>
               <td className="text-xs">{jam(d.terakhir_input)}</td>
             </tr>
           ))}
@@ -77,10 +77,10 @@ function Top({ title, rows, k }: { title: string; rows: RiderRow[]; k: 'alpha' |
       <ol className="list-decimal ml-5 mt-1 text-sm">
         {t.map((r) => (
           <li key={r.rider_id}>
-            {r.nama} <span className="text-zinc-400">({r.ds_nama ?? '-'})</span> — {r[k]}×
+            {r.nama} <span className="text-muted-foreground/70">({r.ds_nama ?? '-'})</span> — {r[k]}×
           </li>
         ))}
-        {!t.length && <li className="list-none text-zinc-500">Tidak ada.</li>}
+        {!t.length && <li className="list-none text-muted-foreground">Tidak ada.</li>}
       </ol>
     </div>
   )
@@ -127,8 +127,8 @@ export function Dashboard() {
                   <span className="font-medium">{x.ds_nama}</span>
                   <span className="font-mono">{pct(x)}</span>
                 </div>
-                <div className="h-2.5 rounded-full bg-zinc-100 overflow-hidden">
-                  <div className={`h-full rounded-full ${p >= 90 ? 'bg-brand' : p >= 70 ? 'bg-brand/60' : 'bg-red-500'}`} style={{ width: `${p}%` }} />
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div className={`h-full rounded-full ${p >= 90 ? 'bg-primary' : p >= 70 ? 'bg-primary/60' : 'bg-danger'}`} style={{ width: `${p}%` }} />
                 </div>
               </div>
             )
@@ -138,7 +138,7 @@ export function Dashboard() {
           <b className="block mb-3">Rincian kehadiran</b>
           {(() => {
             const seg = (['hadir', 'alpha', 'izin', 'sakit', 'tukar', 'pengganti'] as const).map((k) => ({ k, n: r.rows.reduce((a, x) => a + x[k], 0) }))
-            const warna: Record<string, string> = { hadir: 'bg-zinc-900', alpha: 'bg-red-500', izin: 'bg-zinc-400', sakit: 'bg-zinc-300', tukar: 'bg-purple-300', pengganti: 'bg-brand' }
+            const warna: Record<string, string> = { hadir: 'bg-foreground', alpha: 'bg-danger', izin: 'bg-muted-foreground/60', sakit: 'bg-muted-foreground/40', tukar: 'bg-primary/40', pengganti: 'bg-primary' }
             const total = seg.reduce((a, s) => a + s.n, 0)
             if (!total) return <Kosong teks="Belum ada data kehadiran di periode ini" hint="Data muncul setelah Captain mengisi absensi harian." />
             return (
@@ -150,7 +150,7 @@ export function Dashboard() {
                   {seg.map((s) => (
                     <div key={s.k} className="flex items-center gap-2">
                       <span className={`size-2.5 rounded-full ${warna[s.k]}`} />
-                      <span className="capitalize text-zinc-600">{s.k}</span>
+                      <span className="capitalize text-muted-foreground">{s.k}</span>
                       <span className="font-mono font-semibold ml-auto">{s.n}</span>
                     </div>
                   ))}
@@ -161,7 +161,7 @@ export function Dashboard() {
         </div>
       </div>
       {kosong.length > 0 && (
-        <div className="bg-red-50 border border-red-300 rounded p-3 mb-4 text-sm">
+        <div className="bg-danger-soft border border-danger/30 rounded p-3 mb-4 text-sm">
           <b>DS yang belum mengisi absensi:</b>
           <ul className="list-disc ml-5">
             {kosong.map((x) => (
@@ -191,7 +191,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {pindah.rows.map((p: Any, i: number) => (
               <li key={i}>
-                {p.rider?.nama}: {p.dari?.nama ?? 'belum punya DS'} → {p.ke?.nama ?? 'belum punya DS'} <span className="text-zinc-400">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
+                {p.rider?.nama}: {p.dari?.nama ?? 'belum punya DS'} → {p.ke?.nama ?? 'belum punya DS'} <span className="text-muted-foreground/70">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -201,7 +201,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {log.rows.map((l: Any, i: number) => (
               <li key={i}>
-                {l.captain?.nama}: {l.aksi} <span className="text-zinc-400">{l.detail} · {jam(l.waktu)}</span>
+                {l.captain?.nama}: {l.aksi} <span className="text-muted-foreground/70">{l.detail} · {jam(l.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -263,8 +263,8 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
           <tbody>
             {rRows.map((x) => (
               <tr key={x.rider_id}>
-                <td>{x.nama} <span className="text-zinc-400">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
-                <td className={x.alpha ? 'text-red-600 font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
+                <td>{x.nama} <span className="text-muted-foreground/70">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
+                <td className={x.alpha ? 'text-danger font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
               </tr>
             ))}
           </tbody>
@@ -285,7 +285,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
             ))}
           </tbody>
         </table>
-        {det.rows.length > 200 && <p className="text-xs text-zinc-500 mt-1">Menampilkan 200 baris pertama. Unduh CSV untuk melihat semuanya.</p>}
+        {det.rows.length > 200 && <p className="text-xs text-muted-foreground mt-1">Menampilkan 200 baris pertama. Unduh CSV untuk melihat semuanya.</p>}
       </div>
       {dsId && <Kunci dsId={dsId} />}
     </div>
@@ -299,7 +299,7 @@ function Kunci({ dsId }: { dsId: string }) {
   return (
     <div className="card">
       <b>Kunci absensi mingguan</b>
-      <p className="text-xs text-zinc-500 mt-0.5">Setelah dikunci, absensi minggu itu tidak bisa diubah lagi supaya hitungan gaji tidak berubah.</p>
+      <p className="text-xs text-muted-foreground mt-0.5">Setelah dikunci, absensi minggu itu tidak bisa diubah lagi supaya hitungan gaji tidak berubah.</p>
       <ul className="mt-2 text-sm space-y-1">
         {weeks.map((w) => {
           const locked = kunci.rows.some((k) => k.minggu_mulai === w)
@@ -307,7 +307,7 @@ function Kunci({ dsId }: { dsId: string }) {
             <li key={w} className="flex items-center gap-2">
               <span>{hari(w)} – {hari(addDays(w, 6))}</span>
               {locked ? (
-                <span className="text-green-700">🔒 terkunci</span>
+                <span className="text-success">🔒 terkunci</span>
               ) : (
                 <button
                   className="btn2"

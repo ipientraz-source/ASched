@@ -1,4 +1,4 @@
-import { sb, today, hari, useRows, Err, Kosong, Logo, type Me } from './lib'
+import { sb, today, hari, useRows, Err, Kosong, Logo, TemaToggle, type Me } from './lib'
 
 const SHIFT: Record<string, string> = { pagi: 'Pagi', siang: 'Siang', off: 'Libur' }
 
@@ -8,15 +8,15 @@ function List({ rows }: { rows: { tanggal: string; shift: string; ds?: string | 
     <ul className="space-y-2">
       {rows.map((r) => (
         <li key={r.tanggal} className="card !mb-0 !p-3 flex items-center gap-4">
-          <div className="size-12 rounded-lg bg-brand-soft text-brand-dark flex flex-col items-center justify-center leading-none">
+          <div className="size-12 rounded-lg bg-primary-soft text-primary-soft-foreground flex flex-col items-center justify-center leading-none">
             <span className="font-mono text-lg font-bold">{r.tanggal.slice(8)}</span>
             <span className="text-[10px] uppercase font-semibold mt-0.5">{hari(r.tanggal).split(',')[0]}</span>
           </div>
           <div className="flex-1">
             <div className="font-semibold">{SHIFT[r.shift] ?? r.shift}</div>
-            {r.ds && <div className="text-xs text-zinc-500">{r.ds}</div>}
+            {r.ds && <div className="text-xs text-muted-foreground">{r.ds}</div>}
           </div>
-          <span className={`badge ${r.shift === 'pagi' ? 'bg-amber-100 text-amber-800' : r.shift === 'siang' ? 'bg-brand text-white' : 'bg-zinc-200 text-zinc-600'}`}>{SHIFT[r.shift]}</span>
+          <span className={`badge ${r.shift === 'pagi' ? 'bg-warning-soft text-warning' : r.shift === 'siang' ? 'bg-primary text-white' : 'bg-border text-muted-foreground'}`}>{SHIFT[r.shift]}</span>
         </li>
       ))}
     </ul>
@@ -31,13 +31,14 @@ export function RiderApp({ kode, out }: { kode: string; out: () => void }) {
   )
   return (
     <div className="min-h-screen">
-      <div className="bg-ink text-white px-4 pt-5 pb-8">
+      <div className="bg-sidebar text-white px-4 pt-5 pb-8">
         <div className="max-w-md mx-auto flex items-center gap-3">
           <Logo small />
           <div className="flex-1 leading-tight min-w-0">
             <div className="font-display font-bold truncate">{rows[0]?.nama ?? 'Jadwal Saya'}</div>
-            <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">Rider · {kode}</div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-sidebar-foreground">Rider · {kode}</div>
           </div>
+          <TemaToggle className="text-white hover:!bg-white/10" />
           <button className="btn2 !bg-transparent !text-white !border-white/30 hover:!border-white" onClick={out}>Keluar</button>
         </div>
       </div>

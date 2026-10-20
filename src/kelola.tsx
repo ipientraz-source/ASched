@@ -76,9 +76,9 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
         <div><label className="lbl">Group WhatsApp</label><input className="inp" placeholder="Group ID" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} /></div>
         <button className="btn" onClick={simpan}>Simpan</button>
       </div>
-      <div className="flex items-center gap-2 mb-2 pt-3 border-t border-zinc-100">
+      <div className="flex items-center gap-2 mb-2 pt-3 border-t border-border">
         <span className="lbl !mb-0">Captain</span>
-        {cap ? <span className="badge bg-brand-soft text-brand-dark">{cap.nama} · {cap.email}</span> : <span className="badge bg-zinc-200 text-zinc-600">belum ditunjuk</span>}
+        {cap ? <span className="badge bg-primary-soft text-primary-soft-foreground">{cap.nama} · {cap.email}</span> : <span className="badge bg-border text-muted-foreground">belum ditunjuk</span>}
       </div>
       <div className="flex flex-wrap gap-2 items-center">
         <RiderPick riders={candidates} value={pick} onChange={setPick} placeholder="Pilih rider yang jadi Captain" />

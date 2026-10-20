@@ -55,7 +55,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
           <Kosong teks={orang.length ? 'Tidak ada rider yang cocok' : 'Belum ada rider'} hint={orang.length ? 'Ubah kata kunci atau filter DS.' : 'Import CSV di bawah, atau tambah rider satuan.'} />
         </div>
       )}
-      <div className="overflow-x-auto mb-4 rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-x-auto mb-4 rounded-2xl border border-border bg-card shadow-sm">
         <table className="tbl">
           <thead>
             <tr><th>Kode MTR</th><th>Nama</th><th>No HP</th><th>DS</th><th>Peran</th><th>Status</th></tr>
@@ -76,9 +76,9 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
                     dsNama(r.ds_id)
                   )}
                 </td>
-                <td><span className="badge bg-zinc-100 text-zinc-700 capitalize">{r.peran.replace('_', '-')}</span></td>
+                <td><span className="badge bg-muted text-foreground/80 capitalize">{r.peran.replace('_', '-')}</span></td>
                 <td>
-                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-green-700' : 'btn2 capitalize text-zinc-500'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
+                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
                     {r.status}
                   </button>
                 </td>
@@ -183,13 +183,13 @@ function ImportCsv({ done }: { done: () => void }) {
   return (
     <div className="card">
       <b className="block mb-1">Import CSV rider</b>
-      <p className="text-xs text-zinc-500 mb-3">
+      <p className="text-xs text-muted-foreground mb-3">
         Wajib: kode MTR dan nama. Opsional: no_hp, ds, status (aktif / nonaktif). Nama kolom fleksibel (mis. <i>employee_id</i>, <i>full_name</i>, <i>kode mitra</i> juga dikenali). Nama DS harus persis sama dengan DS yang sudah dibuat. Rider yang sudah ada di-update, yang baru ditambah, yang tidak ada di file dibiarkan.{' '}
         <button className="underline" onClick={() => download('template-rider.csv', 'kode_mtr,nama,no_hp,ds,status\r\nMTR001,Budi,0812xxxx,Galaxy,aktif')}>
           Unduh template
         </button>
       </p>
-      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-zinc-500 file:mr-3 file:rounded-md file:border file:border-zinc-300 file:bg-white file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:border-ink" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
+      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:border-foreground/50" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {rows.length > 0 && (
         <div className="mt-4">
           <p className="text-sm mb-2"><b>{file}</b> — {rows.length} baris siap diimpor. Ini 5 baris pertama:</p>
@@ -210,9 +210,9 @@ function ImportCsv({ done }: { done: () => void }) {
       {hasil && (
         <div className="mt-4 text-sm">
           <p>
-            Rider baru: <b>{hasil.inserted}</b> · Diperbarui: <b>{hasil.updated}</b> · Gagal: <b className={hasil.errors.length ? 'text-red-600' : ''}>{hasil.errors.length}</b>
+            Rider baru: <b>{hasil.inserted}</b> · Diperbarui: <b>{hasil.updated}</b> · Gagal: <b className={hasil.errors.length ? 'text-danger' : ''}>{hasil.errors.length}</b>
           </p>
-          <ul className="text-red-600">
+          <ul className="text-danger">
             {hasil.errors.map((e, i) => (
               <li key={i}>baris {e.baris}: {e.pesan}</li>
             ))}
@@ -243,7 +243,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
         {res.map((r) => (
           <li key={r.id} className="flex items-center gap-2 py-1">
             <span>{r.nama}</span>
-            <span className="text-zinc-400">{r.ds_nama ?? 'belum punya DS'}</span>
+            <span className="text-muted-foreground/70">{r.ds_nama ?? 'belum punya DS'}</span>
             <button
               className="btn2 ml-auto"
               disabled={r.ds_id === ds.id}

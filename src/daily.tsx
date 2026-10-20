@@ -11,12 +11,12 @@ const ALASAN: [string, string][] = [
   ['tukar', 'Tukar shift (sudah direncanakan)'],
 ]
 export const WARNA: Record<string, string> = {
-  hadir: 'bg-zinc-900 text-white',
-  alpha: 'bg-red-100 text-red-700',
-  izin: 'bg-zinc-200 text-zinc-700',
-  sakit: 'bg-zinc-200 text-zinc-700',
-  tukar: 'bg-brand-soft text-brand-dark',
-  pengganti: 'bg-brand text-white',
+  hadir: 'bg-foreground text-background',
+  alpha: 'bg-danger-soft text-danger',
+  izin: 'bg-border text-foreground/80',
+  sakit: 'bg-border text-foreground/80',
+  tukar: 'bg-primary-soft text-primary-soft-foreground',
+  pengganti: 'bg-primary text-white',
 }
 
 export function Daily({ ds }: { me: Me; ds: Ds | null }) {
@@ -62,15 +62,15 @@ function DailyInner({ ds }: { ds: Ds }) {
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <input type="date" className="inp" value={tgl} max={today()} onChange={(e) => e.target.value && setTgl(e.target.value)} />
         <b>{hari(tgl)}</b>
-        <span className="flex items-center gap-2 text-sm text-zinc-600">
-          <span className="w-28 h-2 rounded-full bg-zinc-200 overflow-hidden">
-            <span className="block h-full bg-brand" style={{ width: terjadwal.length ? `${(100 * terisi) / terjadwal.length}%` : '0%' }} />
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="w-28 h-2 rounded-full bg-border overflow-hidden">
+            <span className="block h-full bg-primary" style={{ width: terjadwal.length ? `${(100 * terisi) / terjadwal.length}%` : '0%' }} />
           </span>
           <span className="font-mono">{terisi}/{terjadwal.length}</span> rider sudah diabsen
         </span>
         <input className="inp ml-auto" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {locked && <p className="bg-amber-50 border border-amber-300 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
+      {locked && <p className="bg-warning-soft border border-warning/40 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
       <Err msg={riders.err || jd.err || ac.err} />
       <div className="space-y-2">
         {shown.map((r) => (
@@ -124,8 +124,8 @@ function Baris({
     <div className="card !mb-0">
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-40">
-          <b>{r.nama}</b> <span className="text-zinc-400 text-xs">{r.kode_mtr}</span>
-          <div className="text-xs text-zinc-500 capitalize">{shift ?? 'tidak ada di jadwal'}</div>
+          <b>{r.nama}</b> <span className="text-muted-foreground/70 text-xs">{r.kode_mtr}</span>
+          <div className="text-xs text-muted-foreground capitalize">{shift ?? 'tidak ada di jadwal'}</div>
         </div>
         {act && (
           <span className={`badge ${WARNA[act.status]}`}>
@@ -133,7 +133,7 @@ function Baris({
             {act.status === 'pengganti' && act.backup_untuk_id ? ` untuk ${nama(act.backup_untuk_id)}` : ''}
           </span>
         )}
-        {act?.penjelasan && <span className="text-xs text-zinc-500">“{act.penjelasan}”</span>}
+        {act?.penjelasan && <span className="text-xs text-muted-foreground">“{act.penjelasan}”</span>}
         <div className="ml-auto flex gap-2">
           <button className="btn btn-lg" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
             Hadir
@@ -178,7 +178,7 @@ function TambahPengganti({ kandidat, terjadwal, locked, catat }: { kandidat: Rid
   return (
     <div className="card mt-4">
       <b className="block mb-2">Tambah rider pengganti</b>
-      <p className="text-xs text-zinc-500 mb-3 -mt-1">Untuk rider yang masuk kerja padahal tidak ada di jadwal hari itu.</p>
+      <p className="text-xs text-muted-foreground mb-3 -mt-1">Untuk rider yang masuk kerja padahal tidak ada di jadwal hari itu.</p>
       <div className="flex flex-wrap gap-2 items-center">
         <RiderPick riders={kandidat} value={rid} onChange={setRid} placeholder="Rider pengganti" />
         <RiderPick riders={terjadwal} value={gt} onChange={setGt} placeholder="Menggantikan siapa? (opsional)" />

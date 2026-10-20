@@ -48,7 +48,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         )}
       </div>
       <Err msg={riders.err || j.err} />
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
         <table className="tbl">
           <thead>
             <tr>
@@ -62,7 +62,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             {shown.map((r) => (
               <tr key={r.id}>
                 <td className="whitespace-nowrap">
-                  {r.nama} <span className="text-zinc-400">{r.kode_mtr}</span>
+                  {r.nama} <span className="text-muted-foreground/70">{r.kode_mtr}</span>
                 </td>
                 {days.map((d) => {
                   const k = `${r.id}|${d}`
@@ -83,16 +83,16 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                 })}
               </tr>
             ))}
-            <tr className="bg-zinc-50 font-medium">
+            <tr className="bg-muted/50 font-medium">
               <td>Jumlah rider / kuota</td>
               {days.map((d) => {
                 const p = cnt(d, 'pagi')
                 const s = cnt(d, 'siang')
                 return (
                   <td key={d} className="whitespace-nowrap">
-                    <span className={p !== ds.kuota_pagi ? 'text-amber-600' : 'text-green-700'}>P {p}/{ds.kuota_pagi}</span>
+                    <span className={p !== ds.kuota_pagi ? 'text-warning' : 'text-success'}>P {p}/{ds.kuota_pagi}</span>
                     {' · '}
-                    <span className={s !== ds.kuota_siang ? 'text-amber-600' : 'text-green-700'}>S {s}/{ds.kuota_siang}</span>
+                    <span className={s !== ds.kuota_siang ? 'text-warning' : 'text-success'}>S {s}/{ds.kuota_siang}</span>
                   </td>
                 )
               })}
@@ -100,7 +100,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
           </tbody>
         </table>
       </div>
-      {editable && <p className="text-xs text-zinc-500 mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan.</p>}
+      {editable && <p className="text-xs text-muted-foreground mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan.</p>}
     </div>
   )
 }
@@ -123,7 +123,7 @@ export function JadwalSemua() {
           </option>
         ))}
       </select>
-      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-zinc-500">Belum ada DS.</p>}
+      {ds ? <JadwalGrid key={ds.id} ds={ds} editable={false} /> : <p className="text-muted-foreground">Belum ada DS.</p>}
     </div>
   )
 }

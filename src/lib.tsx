@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { useEffect, useState, type ReactNode } from 'react'
-import { AlertCircle, CheckCircle2, Inbox, X, type LucideIcon } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Inbox, Moon, Sun, X, type LucideIcon } from 'lucide-react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
 
@@ -77,24 +77,40 @@ export function Toaster() {
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2 w-96 max-w-[calc(100vw-2rem)]">
       {list.map((t) => (
-        <div key={t.id} className={`rise flex items-start gap-3 rounded-xl border bg-white p-3.5 shadow-xl text-sm ${t.tone === 'ok' ? 'border-brand/30' : 'border-red-200'}`}>
-          {t.tone === 'ok' ? <CheckCircle2 size={18} className="text-brand shrink-0 mt-0.5" /> : <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />}
+        <div key={t.id} className={`rise flex items-start gap-3 rounded-xl border bg-card p-3.5 shadow-xl text-sm ${t.tone === 'ok' ? 'border-primary/30' : 'border-danger/30'}`}>
+          {t.tone === 'ok' ? <CheckCircle2 size={18} className="text-primary shrink-0 mt-0.5" /> : <AlertCircle size={18} className="text-danger shrink-0 mt-0.5" />}
           <span className="flex-1">{t.msg}</span>
-          <button onClick={() => setList((l) => l.filter((x) => x.id !== t.id))} className="text-zinc-400 hover:text-ink"><X size={16} /></button>
+          <button onClick={() => setList((l) => l.filter((x) => x.id !== t.id))} className="text-muted-foreground/70 hover:text-foreground"><X size={16} /></button>
         </div>
       ))}
     </div>
   )
 }
 
+// Tombol mode terang / gelap (pilihan disimpan di perangkat)
+export function TemaToggle({ className = '' }: { className?: string }) {
+  const [gelap, setGelap] = useState(() => document.documentElement.classList.contains('dark'))
+  const ubah = () => {
+    const g = !gelap
+    document.documentElement.classList.toggle('dark', g)
+    store.set('tema', g ? 'gelap' : 'terang')
+    setGelap(g)
+  }
+  return (
+    <button onClick={ubah} title={gelap ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'} aria-label="Ganti tema" className={`p-2 rounded-md transition-colors hover:bg-foreground/10 ${className}`}>
+      {gelap ? <Sun size={16} /> : <Moon size={16} />}
+    </button>
+  )
+}
+
 // Kartu angka dengan ikon
 export function Stat({ icon: Icon, label, value, tone = 'brand' }: { icon: LucideIcon; label: string; value: ReactNode; tone?: 'brand' | 'red' | 'zinc' }) {
-  const warna = { brand: 'bg-brand-soft text-brand', red: 'bg-red-50 text-red-600', zinc: 'bg-zinc-100 text-zinc-600' }[tone]
+  const warna = { brand: 'bg-primary-soft text-primary', red: 'bg-danger-soft text-danger', zinc: 'bg-muted text-muted-foreground' }[tone]
   return (
     <div className="stat flex items-center gap-4">
       <div className={`size-12 shrink-0 rounded-xl flex items-center justify-center ${warna}`}><Icon size={22} /></div>
       <div className="min-w-0">
-        <b className={tone === 'red' ? '!text-red-600' : ''}>{value}</b>
+        <b className={tone === 'red' ? '!text-danger' : ''}>{value}</b>
         <span>{label}</span>
       </div>
     </div>
@@ -207,16 +223,16 @@ export function RiderPick({
 }
 
 export const Err = ({ msg }: { msg: string }) =>
-  msg ? <p className="text-red-600 text-sm mb-3 bg-red-50 border border-red-200 rounded-md px-3 py-2">{msg}</p> : null
+  msg ? <p className="text-danger text-sm mb-3 bg-danger-soft border border-danger/30 rounded-md px-3 py-2">{msg}</p> : null
 
 export const Logo = ({ small }: { small?: boolean }) => (
-  <div className={`${small ? 'size-9 text-base' : 'size-12 text-xl'} shrink-0 rounded-xl bg-brand text-white font-display font-bold flex items-center justify-center shadow-lg shadow-brand/30`}>D</div>
+  <div className={`${small ? 'size-9 text-base' : 'size-12 text-xl'} shrink-0 rounded-xl bg-primary text-white font-display font-bold flex items-center justify-center shadow-lg shadow-primary/30`}>D</div>
 )
 
 export const Kosong = ({ teks, hint }: { teks: string; hint?: string }) => (
-  <div className="flex flex-col items-center text-center py-10 text-zinc-500">
-    <div className="size-12 rounded-full bg-zinc-100 flex items-center justify-center mb-3"><Inbox size={22} className="text-zinc-400" /></div>
-    <p className="font-semibold text-zinc-700">{teks}</p>
+  <div className="flex flex-col items-center text-center py-10 text-muted-foreground">
+    <div className="size-12 rounded-full bg-muted flex items-center justify-center mb-3"><Inbox size={22} className="text-muted-foreground/70" /></div>
+    <p className="font-semibold text-foreground/80">{teks}</p>
     {hint && <p className="text-sm mt-1 max-w-xs">{hint}</p>}
   </div>
 )
