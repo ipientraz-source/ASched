@@ -24,14 +24,25 @@ const pct = (d: DsRow) => (d.terisi > 0 ? Math.round((100 * d.patuh) / d.terisi)
 const jam = (s: string | null) => (s ? new Date(s).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' }) : 'belum pernah')
 
 function useRange() {
-  const [mode, setMode] = useState<'harian' | 'mingguan' | 'bulanan'>('mingguan')
+  const [mode, setMode] = useState<'harian' | 'mingguan' | 'bulanan' | 'rentang'>('mingguan')
   const [ref, setRef] = useState(today())
+  const [akhir, setAkhir] = useState(today()) // ujung rentang sendiri
   const [from, to] =
-    mode === 'harian' ? [ref, ref] : mode === 'mingguan' ? [monday(ref), addDays(monday(ref), 6)] : [ref.slice(0, 8) + '01', lastOfMonth(ref)]
+    mode === 'harian' ? [ref, ref]
+    : mode === 'mingguan' ? [monday(ref), addDays(monday(ref), 6)]
+    : mode === 'bulanan' ? [ref.slice(0, 8) + '01', lastOfMonth(ref)]
+    : ref <= akhir ? [ref, akhir] : [akhir, ref] // rentang bebas: urutannya dibetulkan otomatis
   const ui = (
     <div className="flex flex-wrap gap-2 items-center mb-3">
-      <Select className="w-52" value={mode} onChange={(v) => setMode(v as typeof mode)} opsi={[{ value: 'harian', label: 'Harian' }, { value: 'mingguan', label: 'Mingguan (Senin–Minggu)' }, { value: 'bulanan', label: 'Bulanan' }]} />
-      <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
+      <Select className="w-52" value={mode} onChange={(v) => setMode(v as typeof mode)} opsi={[{ value: 'harian', label: 'Harian' }, { value: 'mingguan', label: 'Mingguan (Senin–Minggu)' }, { value: 'bulanan', label: 'Bulanan' }, { value: 'rentang', label: 'Rentang sendiri' }]} />
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {mode === 'rentang' ? 'Dari' : 'Tanggal acuan'} <input type="date" className="inp" value={ref} onChange={(e) => e.target.value && setRef(e.target.value)} />
+      </label>
+      {mode === 'rentang' && (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          Sampai <input type="date" className="inp" value={akhir} onChange={(e) => e.target.value && setAkhir(e.target.value)} />
+        </label>
+      )}
       <span className="text-sm text-muted-foreground">
         {from} s/d {to}
       </span>

@@ -78,6 +78,27 @@
   --sidebar-foreground: var(--gray-400);
 }
 
+/* "Pulau tema" untuk lembar cetak / unduhan gambar & PDF: selalu terang walau aplikasi sedang mode gelap.
+   Hanya menimpa lapis semantic, komponen di dalamnya tetap memakai token yang sama. */
+.cetak {
+  color-scheme: light;
+  --foreground: var(--gray-950);
+  --card: var(--gray-0);
+  --muted: var(--gray-100);
+  --muted-foreground: var(--gray-500);
+  --border: var(--gray-200);
+  --primary: var(--purple-600);
+  --primary-foreground: var(--gray-0);
+  --primary-soft: var(--purple-50);
+  --primary-soft-foreground: var(--purple-800);
+  --danger: var(--red-600);   --danger-soft: var(--red-100);
+  --warning: var(--amber-700); --warning-soft: var(--amber-100);
+  --success: var(--green-700); --success-soft: var(--green-100);
+  background: var(--gray-0);
+  color: var(--gray-950);
+  font-family: ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif; /* font sistem: hasil unduhan sama di semua perangkat */
+}
+
 /* ── 3. COMPONENT: token khusus komponen, merujuk semantic ── */
 :root {
   --card-radius: 1rem;

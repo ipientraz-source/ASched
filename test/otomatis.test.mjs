@@ -46,6 +46,40 @@ test('maksimal 6 hari kerja: hari ke-7 kosong bila semua rider sudah 6 hari', ()
   riders(3).forEach((id) => assert.ok(hitung(grid, id) <= 6))
 })
 
+const rentang = (dari, n) => Array.from({ length: n }, (_, i) => new Date(Date.parse(dari + 'T00:00:00Z') + i * 864e5).toISOString().slice(0, 10))
+const senin = (d) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7)); return t.toISOString().slice(0, 10) }
+const maksPerPekan = (grid, ids) => Math.max(...ids.flatMap((id) => {
+  const m = {}
+  for (const k of Object.keys(grid)) if (k.startsWith(id + '|')) { const p = senin(k.split('|')[1]); m[p] = (m[p] ?? 0) + 1 }
+  return Object.values(m)
+}))
+
+test('periode bebas 14 hari: batas 6 hari dihitung per minggu, bukan seluruh rentang', () => {
+  const ids = riders(3), hari = rentang('2026-10-26', 14)
+  const { grid, kurang } = buatDraf(ids, hari, 3, 0) // 3 rider, kuota 3/hari: semua harus masuk tiap hari kecuali batas mingguan
+  assert.ok(maksPerPekan(grid, ids) <= 6)
+  assert.equal(Math.max(...ids.map((id) => hitung(grid, id))), 12) // 6 + 6, bukan 6 untuk seluruh 14 hari
+  assert.equal(kurang.length, 2) // hari ke-7 dan ke-14 tak terpenuhi (semua sudah 6 hari di minggunya)
+})
+
+test('periode mulai di tengah minggu (Rabu–Selasa) tetap menghormati batas per minggu kalender', () => {
+  const ids = riders(3), hari = rentang('2026-10-28', 14) // Rabu → Selasa 2 minggu kemudian
+  const { grid } = buatDraf(ids, hari, 3, 0)
+  assert.ok(maksPerPekan(grid, ids) <= 6)
+})
+
+test('periode 1 hari dan periode sebulan berjalan; kuota terpenuhi bila rider cukup', () => {
+  const satu = buatDraf(riders(4), ['2026-10-26'], 2, 2)
+  assert.equal(Object.keys(satu.grid).length, 4)
+  assert.deepEqual(satu.kurang, [])
+  const ids = riders(10), bulan = rentang('2026-11-01', 30)
+  const { grid, kurang } = buatDraf(ids, bulan, 3, 3)
+  assert.deepEqual(kurang, [])
+  assert.ok(maksPerPekan(grid, ids) <= 6)
+  const n = ids.map((id) => hitung(grid, id))
+  assert.ok(Math.max(...n) - Math.min(...n) <= 1, `tidak merata: ${n}`)
+})
+
 test('tanpa rider atau kuota 0: draf kosong, tidak error', () => {
   assert.deepEqual(buatDraf([], hari7, 2, 1).grid, {})
   assert.equal(buatDraf([], hari7, 2, 1).kurang.length, 7)
