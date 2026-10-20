@@ -1,6 +1,7 @@
 // Unduh jadwal sebagai gambar (PNG) atau PDF.
 // Semuanya dibuat di browser lalu langsung diunduh: tidak ada yang diunggah atau disimpan di database.
 import { useEffect, useRef } from 'react'
+import { Lock } from 'lucide-react'
 
 export type DataCetak = {
   judul: string
@@ -21,19 +22,23 @@ const potong = <T,>(l: T[], n: number) => (l.length ? Array.from({ length: Math.
 // Hijau = pas, kuning = kurang; kelebihan: biru bila masih dalam jatah cadangan, merah bila melebihi
 const warnaKuota = (n: number, q: number, lebihTotal: number, cad: number) => (n === q ? 'text-success' : n < q ? 'text-warning' : lebihTotal <= cad ? 'text-primary' : 'text-danger')
 
+const TEPI_PAGI = '0 2px 0 #d97706'
+const TEPI_SIANG = '0 2px 0 var(--purple-800)'
+
 function Sel({ v, padat }: { v: string; padat: boolean }) {
-  if (!v) return padat ? <span className="text-muted-foreground/40">·</span> : <span className="text-xs text-muted-foreground/60">Off</span>
+  if (!v) return padat ? <span className="text-muted-foreground/40">·</span> : <span className="text-xs font-medium text-muted-foreground/60">Off</span>
   if (v === 'off')
     return padat ? (
-      <span className="inline-flex size-6 items-center justify-center rounded bg-muted text-[10px] font-bold text-muted-foreground">O</span>
+      <span className="inline-flex size-6 items-center justify-center rounded-md bg-muted text-[10px] font-bold text-muted-foreground">O</span>
     ) : (
-      <span className="inline-block w-[4.5rem] rounded-lg border border-border bg-muted px-2 py-1.5 text-xs font-semibold text-muted-foreground">Off</span>
+      <span className="inline-flex w-[4.5rem] items-center justify-center gap-1 rounded-lg border border-border bg-muted px-2 py-1.5 text-xs font-bold text-foreground/70"><Lock size={11} />Off</span>
     )
   const pagi = v === 'pagi'
-  if (padat)
-    return <span className={`inline-flex size-6 items-center justify-center rounded text-[11px] font-bold ${pagi ? 'bg-warning-soft text-warning' : 'bg-primary-soft text-primary-soft-foreground'}`}>{pagi ? 'P' : 'S'}</span>
+  const warna = pagi ? 'bg-[var(--amber-400)] text-[#451a03]' : 'bg-primary text-primary-foreground'
+  const tepi = pagi ? TEPI_PAGI : TEPI_SIANG
+  if (padat) return <span style={{ boxShadow: tepi }} className={`inline-flex size-6 items-center justify-center rounded-md text-[11px] font-bold ${warna}`}>{pagi ? 'P' : 'S'}</span>
   return (
-    <span className={`inline-block w-[4.5rem] rounded-lg border px-2 py-1.5 text-xs font-semibold ${pagi ? 'border-warning/30 bg-warning-soft text-warning' : 'border-primary/30 bg-primary-soft text-primary-soft-foreground'}`}>
+    <span style={{ boxShadow: tepi }} className={`inline-block w-[4.5rem] rounded-lg px-2 py-1.5 text-xs font-bold ${warna}`}>
       {pagi ? 'Pagi' : 'Siang'}
     </span>
   )
@@ -44,7 +49,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
   const akar = useRef<HTMLDivElement>(null)
   const padat = days.length > 10 // periode panjang: sel ringkas (huruf P / S)
   const lebarSel = padat ? 30 : 84
-  const lebar = Math.max(1000, 56 + 270 + 84 + days.length * lebarSel)
+  const lebar = Math.max(1000, 56 + 330 + 84 + days.length * lebarSel)
   const tinggiPdf = Math.round((lebar * 210) / 297) // rasio A4 landscape
   const barisH = padat ? 34 : 46
   const sisa = tinggiPdf - 150 - (padat ? 92 : 70) - 78 - 40 - 56
@@ -92,46 +97,57 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const nPagi = riders.reduce((n, r) => n + days.filter((d) => g[`${r.id}|${d}`] === 'pagi').length, 0)
+  const nSiang = riders.reduce((n, r) => n + days.filter((d) => g[`${r.id}|${d}`] === 'siang').length, 0)
+  const ringkas: [string, number][] = [['Rider', riders.length], ['Shift pagi', nPagi], ['Shift siang', nSiang], ['Total shift', nPagi + nSiang]]
+
   return (
     <div ref={akar} aria-hidden style={{ position: 'fixed', left: -100000, top: 0, pointerEvents: 'none' }}>
       {halaman.map((rows, hal) => (
-        <div key={hal} data-lembar className="cetak flex flex-col" style={{ width: lebar, height: mode === 'pdf' ? tinggiPdf : undefined, padding: 28, boxSizing: 'border-box' }}>
-          <div className="flex items-start justify-between">
+        <div key={hal} data-lembar className="cetak flex flex-col" style={{ width: lebar, height: mode === 'pdf' ? tinggiPdf : undefined, padding: 28, boxSizing: 'border-box', background: '#f4f4f7' }}>
+          <div className="flex items-center justify-between rounded-2xl px-6 py-5 text-white" style={{ background: 'linear-gradient(120deg, var(--purple-600), var(--purple-900))', height: 96, boxSizing: 'border-box' }}>
             <div>
-              <div className="text-2xl font-bold">{data.judul}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
+              <div className="text-2xl font-extrabold leading-tight">{data.judul}</div>
+              <div className="mt-1 text-sm text-white/80">
                 Periode {tanggalPanjang(awal)} – {tanggalPanjang(akhir)} · {days.length} hari
               </div>
             </div>
-            <div className="text-right text-xs text-muted-foreground">
-              <div className="font-semibold text-foreground">Dash Scheduler</div>
-              <div>Dicetak {dicetak}</div>
-              {halaman.length > 1 && <div>Halaman {hal + 1} dari {halaman.length}</div>}
+            <div className="text-right">
+              <div className="flex justify-end gap-2">
+                {ringkas.map(([k, n]) => (
+                  <div key={k} className="rounded-lg bg-white/15 px-3 py-1 text-center">
+                    <div className="font-mono text-base font-bold leading-tight">{n}</div>
+                    <div className="text-[10px] text-white/80">{k}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1.5 text-[11px] text-white/70">Dash Scheduler · Dicetak {dicetak}{halaman.length > 1 ? ` · Hal. ${hal + 1}/${halaman.length}` : ''}</div>
             </div>
           </div>
-          <div className="mb-3 mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="mb-3 mt-4 flex items-center gap-5 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5"><Sel v="pagi" padat={false} /> shift pagi</span>
             <span className="flex items-center gap-1.5"><Sel v="siang" padat={false} /> shift siang</span>
             <span className="flex items-center gap-1.5"><Sel v="off" padat={false} /> libur terkunci (cuti/izin)</span>
             <span className="flex items-center gap-1.5"><Sel v="" padat={false} /> libur</span>
           </div>
 
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }} className="text-sm">
             <colgroup>
-              <col style={{ width: 270 }} />
+              <col style={{ width: 330 }} />
               {days.map((d) => <col key={d} style={{ width: lebarSel }} />)}
               <col style={{ width: 84 }} />
             </colgroup>
             <thead>
-              <tr className="border-b border-border">
-                <th className="py-2 text-left font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rider</th>
+              <tr className="border-b border-border bg-muted">
+                <th className="py-2 pl-4 text-left font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rider</th>
                 {days.map((d, i) => {
                   const akhirPekan = ['Sab', 'Min'].includes(namaHari(d))
                   const tandaBulan = i === 0 || d.slice(8) === '01'
                   return (
-                    <th key={d} className={`py-1.5 text-center ${akhirPekan ? 'bg-muted' : ''}`}>
-                      <div className="h-3 text-[9px] font-semibold uppercase text-primary">{tandaBulan ? bulanDi(d) : ''}</div>
-                      <div className={`font-mono font-semibold uppercase text-muted-foreground ${padat ? 'text-[9px]' : 'text-[10px]'}`}>{namaHari(d)}</div>
+                    <th key={d} className={`py-1.5 text-center ${akhirPekan ? 'bg-primary-soft' : ''}`}>
+                      <div className="h-3 text-[9px] font-bold uppercase text-primary">{tandaBulan ? bulanDi(d) : ''}</div>
+                      <div className={`font-mono font-semibold uppercase ${akhirPekan ? 'text-primary' : 'text-muted-foreground'} ${padat ? 'text-[9px]' : 'text-[10px]'}`}>{namaHari(d)}</div>
                       <div className={`font-bold ${padat ? 'text-xs' : 'text-base'}`}>{d.slice(8)}</div>
                     </th>
                   )
@@ -140,17 +156,20 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border" style={{ height: barisH }}>
-                  <td className="truncate pr-2">
-                    <span className="font-medium">{r.nama}</span> <span className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</span>
+              {rows.map((r, i) => (
+                <tr key={r.id} className={`border-b border-border ${i % 2 ? 'bg-muted/60' : ''}`} style={{ height: barisH }}>
+                  <td className="truncate pl-4 pr-2">
+                    <span className="mr-2 inline-flex size-5 items-center justify-center rounded-md bg-muted font-mono text-[10px] font-bold text-muted-foreground">{hal * perHalaman + i + 1}</span>
+                    <span className="font-semibold">{r.nama}</span> <span className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</span>
                   </td>
                   {days.map((d) => (
-                    <td key={d} className={`text-center ${['Sab', 'Min'].includes(namaHari(d)) ? 'bg-muted/50' : ''}`}>
+                    <td key={d} className={`text-center ${['Sab', 'Min'].includes(namaHari(d)) ? 'bg-primary-soft/60' : ''}`}>
                       <Sel v={g[`${r.id}|${d}`] ?? ''} padat={padat} />
                     </td>
                   ))}
-                  <td className="text-center font-mono font-semibold">{days.filter((d) => ['pagi', 'siang'].includes(g[`${r.id}|${d}`])).length}</td>
+                  <td className="text-center">
+                    <span className="inline-block min-w-8 rounded-full bg-primary-soft px-2 py-0.5 font-mono text-xs font-bold text-primary-soft-foreground">{days.filter((d) => ['pagi', 'siang'].includes(g[`${r.id}|${d}`])).length}</span>
+                  </td>
                 </tr>
               ))}
               {!rows.length && (
@@ -159,7 +178,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
             </tbody>
             <tfoot>
               <tr className="bg-muted">
-                <td className="py-2 pl-2 text-xs font-semibold">
+                <td className="py-2 pl-4 text-xs font-semibold">
                   Terisi / kebutuhan client
                   <div className="text-[10px] font-normal text-muted-foreground">Kebutuhan bisa berbeda tiap hari; +cad = rider cadangan</div>
                 </td>
@@ -180,7 +199,8 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
               </tr>
             </tfoot>
           </table>
-          <div className="mt-auto pt-3 text-[10px] text-muted-foreground">Dibuat dengan Dash Scheduler. Warna hijau pada kuota berarti jumlah rider pas, kuning kurang, merah kelebihan.</div>
+          </div>
+          <div className="mt-auto pt-3 text-[10px] text-muted-foreground">Dibuat dengan Dash Scheduler. Angka kuota: hijau berarti rider pas, kuning kurang, merah kelebihan.</div>
         </div>
       ))}
     </div>
