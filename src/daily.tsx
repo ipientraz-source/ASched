@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { sb, today, monday, hari, useRows, ok, Err, Kosong, RiderPick, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, type Ds, type Me, type Rider } from './lib'
 
 type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null }
 type Catat = (rider: string, status: string, backup?: string, teks?: string) => Promise<boolean>
 
 const ALASAN: [string, string][] = [
-  ['alpha', 'Tidak hadir dadakan / Alpha'],
+  ['alpha', 'Tidak hadir tanpa kabar (Alpha)'],
   ['izin', 'Izin'],
   ['sakit', 'Sakit'],
-  ['tukar', 'Tukar terencana'],
+  ['tukar', 'Tukar shift (sudah direncanakan)'],
 ]
 export const WARNA: Record<string, string> = {
   hadir: 'bg-zinc-900 text-white',
@@ -20,7 +20,7 @@ export const WARNA: Record<string, string> = {
 }
 
 export function Daily({ ds }: { me: Me; ds: Ds | null }) {
-  return ds ? <DailyInner ds={ds} /> : <p>Anda belum ditunjuk sebagai Captain DS manapun.</p>
+  return ds ? <DailyInner ds={ds} /> : <p>Anda belum ditunjuk sebagai Captain di DS mana pun.</p>
 }
 
 function DailyInner({ ds }: { ds: Ds }) {
@@ -66,11 +66,11 @@ function DailyInner({ ds }: { ds: Ds }) {
           <span className="w-28 h-2 rounded-full bg-zinc-200 overflow-hidden">
             <span className="block h-full bg-brand" style={{ width: terjadwal.length ? `${(100 * terisi) / terjadwal.length}%` : '0%' }} />
           </span>
-          <span className="font-mono">{terisi}/{terjadwal.length}</span> terisi
+          <span className="font-mono">{terisi}/{terjadwal.length}</span> rider sudah diabsen
         </span>
         <input className="inp ml-auto" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {locked && <p className="bg-amber-50 border border-amber-300 rounded p-2 text-sm mb-3">Periode minggu ini sudah dikunci — actual tidak bisa diubah.</p>}
+      {locked && <p className="bg-amber-50 border border-amber-300 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
       <Err msg={riders.err || jd.err || ac.err} />
       <div className="space-y-2">
         {shown.map((r) => (
@@ -86,7 +86,7 @@ function DailyInner({ ds }: { ds: Ds }) {
             hapus={hapus}
           />
         ))}
-        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider terjadwal pada tanggal ini" hint="Susun jadwal di tab Jadwal DS Saya, atau tambahkan rider pengganti di bawah." /></div>}
+        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider yang dijadwalkan di tanggal ini" hint="Susun jadwal di tab Jadwal DS Saya, atau tambahkan rider pengganti di bawah." /></div>}
       </div>
       <TambahPengganti
         kandidat={riders.rows.filter((r) => !listed.some((l) => l.id === r.id))}
@@ -116,7 +116,7 @@ function Baris({
   const [teks, setTeks] = useState('')
 
   const simpan = async () => {
-    if (alasan === 'tukar' && !backup) return alert('Pilih rekan yang bertukar')
+    if (alasan === 'tukar' && !backup) return toast('Pilih rekan yang bertukar')
     if (await catat(r.id, alasan, alasan === 'alpha' || alasan === 'tukar' ? backup : undefined, teks)) setBuka(false)
   }
 
@@ -125,7 +125,7 @@ function Baris({
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-40">
           <b>{r.nama}</b> <span className="text-zinc-400 text-xs">{r.kode_mtr}</span>
-          <div className="text-xs text-zinc-500 capitalize">{shift ?? 'tidak dijadwalkan'}</div>
+          <div className="text-xs text-zinc-500 capitalize">{shift ?? 'tidak ada di jadwal'}</div>
         </div>
         {act && (
           <span className={`badge ${WARNA[act.status]}`}>
@@ -139,11 +139,11 @@ function Baris({
             Hadir
           </button>
           <button className="btn2 btn-lg" disabled={locked} onClick={() => setBuka(!buka)}>
-            Tidak
+            Tidak hadir
           </button>
           {act && (
-            <button className="btn2" disabled={locked} onClick={() => hapus(r.id)} title="Kembali ke belum diisi">
-              Reset
+            <button className="btn2" disabled={locked} onClick={() => hapus(r.id)} title="Hapus isian, kembali ke belum diabsen">
+              Batalkan
             </button>
           )}
         </div>
@@ -158,10 +158,10 @@ function Baris({
             ))}
           </select>
           {(alasan === 'alpha' || alasan === 'tukar') && (
-            <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Backup (opsional)'} />
+            <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Pengganti / backup (opsional)'} />
           )}
           {alasan !== 'tukar' && (
-            <input className="inp flex-1 min-w-40" placeholder={alasan === 'sakit' ? 'Penjelasan (opsional)' : 'Penjelasan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
+            <input className="inp flex-1 min-w-40" placeholder={alasan === 'sakit' ? 'Keterangan (opsional)' : 'Keterangan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
           )}
           <button className="btn" onClick={simpan}>
             Simpan
@@ -178,9 +178,10 @@ function TambahPengganti({ kandidat, terjadwal, locked, catat }: { kandidat: Rid
   return (
     <div className="card mt-4">
       <b className="block mb-2">Tambah rider pengganti</b>
+      <p className="text-xs text-zinc-500 mb-3 -mt-1">Untuk rider yang masuk kerja padahal tidak ada di jadwal hari itu.</p>
       <div className="flex flex-wrap gap-2 items-center">
         <RiderPick riders={kandidat} value={rid} onChange={setRid} placeholder="Rider pengganti" />
-        <RiderPick riders={terjadwal} value={gt} onChange={setGt} placeholder="Menggantikan (opsional)" />
+        <RiderPick riders={terjadwal} value={gt} onChange={setGt} placeholder="Menggantikan siapa? (opsional)" />
         <button
           className="btn"
           disabled={!rid || locked}

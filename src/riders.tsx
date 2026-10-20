@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { sb, useRows, ok, Err, Kosong, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { UserCheck, UserMinus, Users } from 'lucide-react'
+import { sb, useRows, ok, toast, Err, Kosong, Stat, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -27,16 +28,16 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
   return (
     <div>
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="stat"><b>{orang.length}</b><span>Total rider</span></div>
-        <div className="stat"><b>{aktif}</b><span>Aktif</span></div>
-        <div className="stat"><b>{orang.filter((r) => !r.ds_id && r.peran === 'rider').length}</b><span>Kolam bebas (belum punya DS)</span></div>
+        <Stat icon={Users} label="Total rider" value={orang.length} />
+        <Stat icon={UserCheck} label="Rider aktif" value={aktif} tone="zinc" />
+        <Stat icon={UserMinus} label="Belum punya DS" value={orang.filter((r) => !r.ds_id && r.peran === 'rider').length} tone="zinc" />
       </div>
       <div className="flex flex-wrap gap-2 mb-3">
         <input className="inp" placeholder="cari nama / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
         {sup && (
           <select className="inp" value={fds} onChange={(e) => setFds(e.target.value)}>
             <option value="">Semua DS</option>
-            <option value="-">Kolam bebas</option>
+            <option value="-">Belum punya DS</option>
             {dsl.rows.map((d) => (
               <option key={d.id} value={d.id}>{d.nama}</option>
             ))}
@@ -44,7 +45,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
         )}
         {sup && (
           <button className="btn2 ml-auto" onClick={() => download('rider.csv', toCsv(shown.map((r) => ({ kode_mtr: r.kode_mtr, nama: r.nama, no_hp: r.no_hp, ds: dsNama(r.ds_id) === '—' ? '' : dsNama(r.ds_id), status: r.status, peran: r.peran }))))}>
-            Ekspor CSV
+            Unduh CSV
           </button>
         )}
       </div>
@@ -54,7 +55,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
           <Kosong teks={orang.length ? 'Tidak ada rider yang cocok' : 'Belum ada rider'} hint={orang.length ? 'Ubah kata kunci atau filter DS.' : 'Import CSV di bawah, atau tambah rider satuan.'} />
         </div>
       )}
-      <div className="overflow-x-auto mb-4">
+      <div className="overflow-x-auto mb-4 rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <table className="tbl">
           <thead>
             <tr><th>Kode MTR</th><th>Nama</th><th>No HP</th><th>DS</th><th>Peran</th><th>Status</th></tr>
@@ -66,7 +67,7 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
                 <td>
                   {sup ? (
                     <select className="inp" value={r.ds_id ?? ''} onChange={(e) => setDs(r, e.target.value)}>
-                      <option value="">— kolam bebas —</option>
+                      <option value="">— belum punya DS —</option>
                       {dsl.rows.map((d) => (
                         <option key={d.id} value={d.id}>{d.nama}</option>
                       ))}
@@ -75,9 +76,9 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
                     dsNama(r.ds_id)
                   )}
                 </td>
-                <td>{r.peran}</td>
+                <td><span className="badge bg-zinc-100 text-zinc-700 capitalize">{r.peran.replace('_', '-')}</span></td>
                 <td>
-                  <button className={r.status === 'aktif' ? 'btn2 text-green-700' : 'btn2 text-zinc-500'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
+                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-green-700' : 'btn2 capitalize text-zinc-500'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
                     {r.status}
                   </button>
                 </td>
@@ -96,13 +97,13 @@ function TambahRider({ dsl, done }: { dsl: Ds[]; done: () => void }) {
   const [f, setF] = useState({ kode_mtr: '', nama: '', no_hp: '', ds_id: '' })
   return (
     <div className="card">
-      <b className="block mb-2">Tambah rider satuan</b>
+      <b className="block mb-2">Tambah satu rider</b>
       <div className="flex flex-wrap gap-2">
         <input className="inp" placeholder="Kode MTR" value={f.kode_mtr} onChange={(e) => setF({ ...f, kode_mtr: e.target.value })} />
         <input className="inp" placeholder="Nama" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
         <input className="inp" placeholder="No HP" value={f.no_hp} onChange={(e) => setF({ ...f, no_hp: e.target.value })} />
         <select className="inp" value={f.ds_id} onChange={(e) => setF({ ...f, ds_id: e.target.value })}>
-          <option value="">— kolam bebas —</option>
+          <option value="">— belum punya DS —</option>
           {dsl.map((d) => (
             <option key={d.id} value={d.id}>{d.nama}</option>
           ))}
@@ -150,12 +151,12 @@ function ImportCsv({ done }: { done: () => void }) {
   async function onFile(f: File) {
     setHasil(null)
     const [h, ...body] = parseCsv((await f.text()).replace(/^﻿/, ''))
-    if (!h || !body.length) return alert('CSV kosong atau hanya berisi header')
+    if (!h || !body.length) return toast('CSV kosong atau hanya berisi header')
     const col: Record<string, number> = {}
     h.forEach((x, i) => {
       for (const [field, al] of Object.entries(ALIAS)) if (!(field in col) && (norm(x) === norm(field) || al.includes(norm(x)))) col[field] = i
     })
-    if (!('kode_mtr' in col) || !('nama' in col)) return alert('Kolom wajib tidak ditemukan: kode_mtr (atau employee_id / kode mitra) dan nama (atau full_name)')
+    if (!('kode_mtr' in col) || !('nama' in col)) return toast('Kolom wajib tidak ditemukan: kode_mtr (atau employee_id / kode mitra) dan nama (atau full_name)')
     const get = (c: string[], k: string) => (k in col ? (c[col[k]] ?? '').trim() : '')
     setRows(
       body
@@ -172,7 +173,7 @@ function ImportCsv({ done }: { done: () => void }) {
     setBusy(true)
     const { data, error } = await sb.rpc('import_riders', { p_rows: rows })
     setBusy(false)
-    if (error) return alert(error.message)
+    if (error) return toast(error.message)
     setHasil(data as Hasil)
     setRows([])
     setFile('')
@@ -191,7 +192,7 @@ function ImportCsv({ done }: { done: () => void }) {
       <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-zinc-500 file:mr-3 file:rounded-md file:border file:border-zinc-300 file:bg-white file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:border-ink" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {rows.length > 0 && (
         <div className="mt-4">
-          <p className="text-sm mb-2"><b>{file}</b> — {rows.length} baris siap diimpor. Pratinjau 5 baris pertama:</p>
+          <p className="text-sm mb-2"><b>{file}</b> — {rows.length} baris siap diimpor. Ini 5 baris pertama:</p>
           <div className="overflow-x-auto mb-3">
             <table className="tbl">
               <thead><tr><th>Baris</th><th>Kode MTR</th><th>Nama</th><th>No HP</th><th>DS</th><th>Status</th></tr></thead>
@@ -209,7 +210,7 @@ function ImportCsv({ done }: { done: () => void }) {
       {hasil && (
         <div className="mt-4 text-sm">
           <p>
-            Ditambah <b>{hasil.inserted}</b>, di-update <b>{hasil.updated}</b>, error <b className={hasil.errors.length ? 'text-red-600' : ''}>{hasil.errors.length}</b>
+            Rider baru: <b>{hasil.inserted}</b> · Diperbarui: <b>{hasil.updated}</b> · Gagal: <b className={hasil.errors.length ? 'text-red-600' : ''}>{hasil.errors.length}</b>
           </p>
           <ul className="text-red-600">
             {hasil.errors.map((e, i) => (
@@ -228,7 +229,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
   const [res, setRes] = useState<{ id: string; nama: string; ds_id: string | null; ds_nama: string | null; status: string }[]>([])
   const cari = async () => {
     const { data, error } = await sb.rpc('cari_rider', { p_q: q.trim() })
-    if (error) return alert(error.message)
+    if (error) return toast(error.message)
     setRes(data ?? [])
   }
   return (
@@ -242,12 +243,12 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
         {res.map((r) => (
           <li key={r.id} className="flex items-center gap-2 py-1">
             <span>{r.nama}</span>
-            <span className="text-zinc-400">{r.ds_nama ?? 'kolam bebas'}</span>
+            <span className="text-zinc-400">{r.ds_nama ?? 'belum punya DS'}</span>
             <button
               className="btn2 ml-auto"
               disabled={r.ds_id === ds.id}
               onClick={async () => {
-                if (confirm(`Tarik ${r.nama} dari ${r.ds_nama ?? 'kolam bebas'} ke ${ds.nama}?`) && (await ok(sb.rpc('tarik_rider', { p_rider: r.id })))) {
+                if (confirm(`Tarik ${r.nama} dari ${r.ds_nama ?? 'belum punya DS'} ke ${ds.nama}?`) && (await ok(sb.rpc('tarik_rider', { p_rider: r.id })))) {
                   setRes([])
                   done()
                 }

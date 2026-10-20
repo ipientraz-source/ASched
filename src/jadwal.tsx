@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, type Ds, type Me, type Rider } from './lib'
 
 // Grid jadwal 1 DS × 1 minggu (Senin–Minggu). editable = Captain; read-only = Super-admin.
 export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
@@ -27,7 +27,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         return { rider_id, tanggal, shift }
       })
     if (await ok(sb.rpc('simpan_jadwal', { p_ds: ds.id, p_dari: days[0], p_sampai: days[6], p_rows: rows }))) {
-      alert('Jadwal tersimpan')
+      toast.ok('Jadwal berhasil disimpan')
       j.reload()
     }
   }
@@ -48,7 +48,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
         )}
       </div>
       <Err msg={riders.err || j.err} />
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <table className="tbl">
           <thead>
             <tr>
@@ -84,7 +84,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
               </tr>
             ))}
             <tr className="bg-zinc-50 font-medium">
-              <td>Terisi / kuota</td>
+              <td>Jumlah rider / kuota</td>
               {days.map((d) => {
                 const p = cnt(d, 'pagi')
                 const s = cnt(d, 'siang')
@@ -100,13 +100,13 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
           </tbody>
         </table>
       </div>
-      {editable && <p className="text-xs text-zinc-500 mt-2">Kuota hanya peringatan (kuning = belum pas), jadwal tetap bisa disimpan.</p>}
+      {editable && <p className="text-xs text-zinc-500 mt-2">Warna kuning artinya jumlah rider belum sama dengan kuota. Jadwal tetap bisa disimpan.</p>}
     </div>
   )
 }
 
 export function JadwalDs({ ds }: { me: Me; ds: Ds | null }) {
-  return ds ? <JadwalGrid key={ds.id} ds={ds} editable /> : <p>Anda belum ditunjuk sebagai Captain DS manapun.</p>
+  return ds ? <JadwalGrid key={ds.id} ds={ds} editable /> : <p>Anda belum ditunjuk sebagai Captain di DS mana pun.</p>
 }
 
 // Super-admin: lihat jadwal semua DS (read-only — penyusunan sepenuhnya di Captain)

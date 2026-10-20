@@ -10,16 +10,24 @@
   --color-ink: #111113;
 }
 
-body { @apply bg-zinc-50 text-ink font-sans antialiased; }
+body {
+  @apply bg-zinc-50 text-ink font-sans antialiased;
+  background-image: radial-gradient(60rem 28rem at 100% -8%, rgb(124 58 237 / 0.07), transparent), radial-gradient(40rem 24rem at -10% 110%, rgb(124 58 237 / 0.05), transparent);
+  background-attachment: fixed;
+}
 h1, h2, h3 { font-family: var(--font-display); }
+::selection { background: rgb(124 58 237 / 0.2); }
+
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.28s ease-out both; }
 
 @layer components {
   .inp { @apply border border-zinc-300 rounded-md px-2.5 py-1.5 text-sm bg-white placeholder:text-zinc-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20; }
   .btn { @apply bg-brand text-white rounded-md px-3.5 py-1.5 text-sm font-semibold hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
   .btn2 { @apply border border-zinc-300 rounded-md px-3.5 py-1.5 text-sm font-medium bg-white hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
   .btn-lg { @apply min-h-11 px-5 text-base; }
-  .card { @apply bg-white border border-zinc-200 rounded-xl p-4 mb-4 shadow-sm; }
-  .stat { @apply bg-white border border-zinc-200 rounded-xl p-4 shadow-sm; }
+  .card { @apply bg-white border border-zinc-200 rounded-2xl p-5 mb-4 shadow-sm; }
+  .stat { @apply bg-white border border-zinc-200 rounded-2xl p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-brand/30; }
   .stat b { @apply block font-mono text-2xl font-bold text-ink; }
   .stat span { @apply text-xs text-zinc-500; }
   .lbl { @apply block font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1; }

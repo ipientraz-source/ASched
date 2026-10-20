@@ -13,17 +13,17 @@ type P = { me: Me; ds: Ds | null }
 type Tab = { nama: string; desc: string; Icon: LucideIcon; View: (p: P) => ReactElement }
 
 const SUPER: Tab[] = [
-  { nama: 'Dashboard', desc: 'Ringkasan kepatuhan jadwal dan keaktifan Captain per DS', Icon: LayoutDashboard, View: () => <Dashboard /> },
-  { nama: 'Data Rider', desc: 'Penggolongan rider ke DS, status aktif/nonaktif, import & ekspor CSV', Icon: Users, View: DataRider },
-  { nama: 'Jadwal', desc: 'Jadwal seluruh DS (hanya lihat — penyusunan dilakukan Captain)', Icon: CalendarDays, View: () => <JadwalSemua /> },
-  { nama: 'Laporan Actual', desc: 'Selisih rencana vs kenyataan, rekap per rider, dan kunci periode', Icon: ClipboardList, View: Rekap },
-  { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota, tunjuk Captain dan Super-admin', Icon: Building2, View: () => <Kelola /> },
+  { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di semua DS', Icon: LayoutDashboard, View: () => <Dashboard /> },
+  { nama: 'Data Rider', desc: 'Atur rider: pindahkan ke DS lain, ubah status aktif/nonaktif, import dan unduh CSV', Icon: Users, View: DataRider },
+  { nama: 'Jadwal', desc: 'Lihat jadwal semua DS. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: () => <JadwalSemua /> },
+  { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
+  { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota rider, pilih Captain, dan tambah Super-admin', Icon: Building2, View: () => <Kelola /> },
 ]
 const CAPTAIN: Tab[] = [
   { nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda sebagai rider', Icon: CalendarCheck, View: JadwalSaya },
-  { nama: 'Daily Report', desc: 'Tandai siapa yang benar-benar masuk hari ini', Icon: ClipboardCheck, View: Daily },
+  { nama: 'Absensi Harian', desc: 'Tandai rider yang masuk dan tidak masuk hari ini', Icon: ClipboardCheck, View: Daily },
   { nama: 'Jadwal DS Saya', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
-  { nama: 'Rekap DS Saya', desc: 'Kepatuhan, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
+  { nama: 'Rekap DS Saya', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
   { nama: 'Rider DS Saya', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
 ]
 const RIDER: Tab[] = [{ nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda', Icon: CalendarCheck, View: JadwalSaya }]
@@ -80,12 +80,12 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
         </div>
         <div className="relative">
           <h2 className="text-4xl font-bold leading-tight mb-4">Jadwal rapi.<br />Kehadiran terpantau.</h2>
-          <p className="text-white/80 max-w-sm mb-8">Captain menyusun jadwal dan mencatat kehadiran harian per DS. Super-admin membaca selisih rencana dan kenyataan tanpa hitung manual.</p>
+          <p className="text-white/80 max-w-sm mb-8">Captain menyusun jadwal dan mencatat siapa yang masuk setiap hari. Super-admin bisa langsung melihat rekap kehadiran tanpa menghitung manual.</p>
           <ul className="space-y-3 text-sm">
             {[
               [CalendarDays, 'Jadwal per DS disusun langsung oleh Captain'],
-              [ClipboardCheck, 'Daily report cepat — satu klik untuk hadir'],
-              [ShieldCheck, 'Akses terkunci per DS di tingkat database'],
+              [ClipboardCheck, 'Absensi harian cepat, cukup satu klik untuk hadir'],
+              [ShieldCheck, 'Data tiap DS aman: Captain hanya bisa membuka DS-nya sendiri'],
             ].map(([I, t]) => {
               const Icon = I as LucideIcon
               return (
@@ -154,7 +154,7 @@ function AdminApp({ email }: { email: string }) {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-sm card text-center !p-6">
           <ShieldCheck className="mx-auto mb-3 text-zinc-400" size={32} />
-          <p className="mb-4 text-sm">Email <b>{email}</b> belum terdaftar sebagai Captain / Super-admin (atau nonaktif).</p>
+          <p className="mb-4 text-sm">Email <b>{email}</b> belum terdaftar sebagai Captain atau Super-admin, atau akunnya sedang nonaktif. Hubungi Super-admin.</p>
           <button className="btn" onClick={() => sb.auth.signOut()}>Keluar</button>
         </div>
       </div>
@@ -208,7 +208,7 @@ function AdminApp({ email }: { email: string }) {
           ))}
         </nav>
 
-        <header className="px-4 md:px-8 pt-6 pb-5 flex flex-wrap items-end gap-2 border-b border-zinc-200 bg-white">
+        <header className="px-4 md:px-8 pt-6 pb-5 flex flex-wrap items-center gap-4 border-b border-zinc-200 bg-white/80 backdrop-blur sticky top-0 z-10"><div className="size-12 rounded-2xl bg-brand-soft text-brand flex items-center justify-center"><cur.Icon size={24} /></div>
           <div className="flex-1 min-w-60">
             <h2 className="text-2xl font-bold">{cur.nama}</h2>
             <p className="text-sm text-zinc-500 mt-0.5">{cur.desc}</p>
@@ -217,7 +217,7 @@ function AdminApp({ email }: { email: string }) {
         </header>
         <main className="px-4 md:px-8 py-6 max-w-6xl">
           {me.peran === 'captain' && <Notif me={me} />}
-          <cur.View key={tab} me={me} ds={ds} />
+          <div key={tab} className="rise"><cur.View me={me} ds={ds} /></div>
         </main>
       </div>
     </div>
@@ -238,7 +238,7 @@ function Notif({ me }: { me: Me }) {
           <BellRing size={16} className="text-brand shrink-0" />
           <span>{x.pesan}</span>
           <button className="underline text-brand-dark ml-auto shrink-0" onClick={async () => { await sb.from('notifikasi').update({ dibaca: true }).eq('id', x.id); n.reload() }}>
-            tandai dibaca
+            Tandai sudah dibaca
           </button>
         </div>
       ))}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, useRows, ok, Err, RiderPick, type Ds, type Rider } from './lib'
+import { sb, useRows, ok, toast, Err, RiderPick, type Ds, type Rider } from './lib'
 
 // Buat / ganti password akun login lewat edge function (service role ada di server, bukan di browser)
 async function buatAkun(email: string, password: string) {
@@ -7,7 +7,7 @@ async function buatAkun(email: string, password: string) {
   if (!error) return true
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const detail = await (error as any).context?.json?.().then((j: any) => j.error).catch(() => null)
-  alert(`Akun login gagal dibuat: ${detail ?? error.message}\nAlternatif: buat manual di Supabase → Authentication → Users.`)
+  toast(`Akun login gagal dibuat: ${detail ?? error.message}\nAlternatif: buat manual di Supabase → Authentication → Users.`)
   return false
 }
 
@@ -58,12 +58,12 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
   const cap = riders.find((r) => r.id === d.captain_id)
 
   const simpan = async () => {
-    if (await ok(sb.from('ds').update({ nama: f.nama.trim(), kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang, group_wa_id: f.group_wa_id || null }).eq('id', d.id))) reload()
+    if (await ok(sb.from('ds').update({ nama: f.nama.trim(), kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang, group_wa_id: f.group_wa_id || null }).eq('id', d.id))) { toast.ok('Perubahan DS disimpan'); reload() }
   }
   const tunjuk = async () => {
     if (!(await ok(sb.rpc('tunjuk_captain', { p_ds: d.id, p_rider: pick, p_email: email })))) return
     if (pw) await buatAkun(email, pw)
-    setPick(''); setEmail(''); setPw('')
+    setPick(''); setEmail(''); setPw(''); toast.ok('Captain berhasil dipilih')
     reload()
   }
 
@@ -81,10 +81,10 @@ function DsCard({ d, riders, candidates, reload }: { d: Ds; riders: Rider[]; can
         {cap ? <span className="badge bg-brand-soft text-brand-dark">{cap.nama} · {cap.email}</span> : <span className="badge bg-zinc-200 text-zinc-600">belum ditunjuk</span>}
       </div>
       <div className="flex flex-wrap gap-2 items-center">
-        <RiderPick riders={candidates} value={pick} onChange={setPick} placeholder="Tunjuk Captain" />
+        <RiderPick riders={candidates} value={pick} onChange={setPick} placeholder="Pilih rider yang jadi Captain" />
         <input className="inp" placeholder="Email Captain" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className="inp" type="password" placeholder="Password (min 8, opsional)" value={pw} onChange={(e) => setPw(e.target.value)} />
-        <button className="btn2" disabled={!pick || !email.trim() || (!!pw && pw.length < 8)} onClick={tunjuk}>Tunjuk</button>
+        <input className="inp" type="password" placeholder="Password (min. 8 karakter, boleh dikosongkan)" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <button className="btn2" disabled={!pick || !email.trim() || (!!pw && pw.length < 8)} onClick={tunjuk}>Jadikan Captain</button>
       </div>
     </div>
   )
@@ -103,7 +103,7 @@ function SuperAdmins({ admins, reload }: { admins: Rider[]; reload: () => void }
       <div className="flex flex-wrap gap-2">
         <input className="inp" placeholder="Nama" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
         <input className="inp" placeholder="Email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
-        <input className="inp" type="password" placeholder="Password (min 8, opsional)" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} />
+        <input className="inp" type="password" placeholder="Password (min. 8 karakter, boleh dikosongkan)" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} />
         <button
           className="btn2"
           disabled={!f.nama.trim() || !f.email.trim() || (!!f.pw && f.pw.length < 8)}

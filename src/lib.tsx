@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
-import { Inbox } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AlertCircle, CheckCircle2, Inbox, X, type LucideIcon } from 'lucide-react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
 
@@ -42,10 +42,63 @@ export function useRows<T>(fn: () => PromiseLike<{ data: unknown; error: { messa
   return { rows, err, reload: () => setN((x) => x + 1) }
 }
 
+// Pesan teknis dari database diterjemahkan agar mudah dipahami; pesan yang sudah berbahasa Indonesia dibiarkan.
+const ramah = (m: string) =>
+  /row-level security|permission denied/i.test(m) ? 'Anda tidak punya izin untuk tindakan ini.'
+  : /duplicate key/i.test(m) ? 'Data sudah ada. Kode MTR, email, dan nama DS tidak boleh kembar.'
+  : /failed to fetch|network/i.test(m) ? 'Koneksi bermasalah. Periksa internet Anda lalu coba lagi.'
+  : /invalid input syntax/i.test(m) ? 'Isian tidak valid. Periksa lagi data yang dimasukkan.'
+  : m
+
 export async function ok(p: PromiseLike<{ error: { message: string } | null }>) {
   const { error } = await p
-  if (error) alert(error.message)
+  if (error) toast(ramah(error.message))
   return !error
+}
+
+// ── notifikasi (menggantikan alert bawaan browser) ──
+type Toast = { id: number; msg: string; tone: 'ok' | 'err' }
+let pushToast: (t: Toast) => void = () => {}
+let toastId = 0
+const emit = (msg: string, tone: Toast['tone']) => pushToast({ id: ++toastId, msg, tone })
+export const toast = Object.assign((msg: string) => emit(msg, 'err'), { ok: (msg: string) => emit(msg, 'ok') })
+
+export function Toaster() {
+  const [list, setList] = useState<Toast[]>([])
+  useEffect(() => {
+    pushToast = (t) => {
+      setList((l) => [...l, t])
+      setTimeout(() => setList((l) => l.filter((x) => x.id !== t.id)), 5000)
+    }
+    return () => {
+      pushToast = () => {}
+    }
+  }, [])
+  return (
+    <div className="fixed bottom-4 right-4 z-50 space-y-2 w-96 max-w-[calc(100vw-2rem)]">
+      {list.map((t) => (
+        <div key={t.id} className={`rise flex items-start gap-3 rounded-xl border bg-white p-3.5 shadow-xl text-sm ${t.tone === 'ok' ? 'border-brand/30' : 'border-red-200'}`}>
+          {t.tone === 'ok' ? <CheckCircle2 size={18} className="text-brand shrink-0 mt-0.5" /> : <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />}
+          <span className="flex-1">{t.msg}</span>
+          <button onClick={() => setList((l) => l.filter((x) => x.id !== t.id))} className="text-zinc-400 hover:text-ink"><X size={16} /></button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Kartu angka dengan ikon
+export function Stat({ icon: Icon, label, value, tone = 'brand' }: { icon: LucideIcon; label: string; value: ReactNode; tone?: 'brand' | 'red' | 'zinc' }) {
+  const warna = { brand: 'bg-brand-soft text-brand', red: 'bg-red-50 text-red-600', zinc: 'bg-zinc-100 text-zinc-600' }[tone]
+  return (
+    <div className="stat flex items-center gap-4">
+      <div className={`size-12 shrink-0 rounded-xl flex items-center justify-center ${warna}`}><Icon size={22} /></div>
+      <div className="min-w-0">
+        <b className={tone === 'red' ? '!text-red-600' : ''}>{value}</b>
+        <span>{label}</span>
+      </div>
+    </div>
+  )
 }
 
 export const store = {

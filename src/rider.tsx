@@ -3,7 +3,7 @@ import { sb, today, hari, useRows, Err, Kosong, Logo, type Me } from './lib'
 const SHIFT: Record<string, string> = { pagi: 'Pagi', siang: 'Siang', off: 'Libur' }
 
 function List({ rows }: { rows: { tanggal: string; shift: string; ds?: string | null }[] }) {
-  if (!rows.length) return <Kosong teks="Belum ada jadwal ke depan" hint="Jadwal akan muncul di sini setelah Captain menyusunnya." />
+  if (!rows.length) return <Kosong teks="Belum ada jadwal" hint="Jadwal akan muncul di sini setelah Captain menyusunnya." />
   return (
     <ul className="space-y-2">
       {rows.map((r) => (

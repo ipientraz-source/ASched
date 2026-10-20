@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, Stat, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
+import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
 type DsRow = {
   ds_id: string; ds_nama: string; dijadwalkan: number; terisi: number; patuh: number; alpha: number; tukar: number
@@ -49,8 +50,8 @@ function DsTable({ rows }: { rows: DsRow[] }) {
       <table className="tbl">
         <thead>
           <tr>
-            <th>DS</th><th>Dijadwalkan</th><th>Kepatuhan</th><th>Alpha</th><th>Tukar</th><th>Pengganti</th>
-            <th>Belum diisi</th><th>Hari kosong</th><th>Input terakhir</th>
+            <th>DS</th><th>Terjadwal</th><th>Sesuai jadwal</th><th>Alpha</th><th>Tukar</th><th>Pengganti</th>
+            <th>Belum diisi</th><th>Hari belum diisi</th><th>Terakhir mengisi</th>
           </tr>
         </thead>
         <tbody>
@@ -109,14 +110,14 @@ export function Dashboard() {
       {ui}
       <Err msg={d.err || r.err} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="stat"><b>{kepatuhan}</b><span>Kepatuhan jadwal</span></div>
-        <div className="stat"><b>{sum('dijadwalkan')}</b><span>Shift dijadwalkan</span></div>
-        <div className="stat"><b className={sum('alpha') ? '!text-red-600' : ''}>{sum('alpha')}</b><span>Alpha</span></div>
-        <div className="stat"><b className={kosong.length ? '!text-red-600' : ''}>{kosong.length}</b><span>DS belum isi actual</span></div>
+        <Stat icon={TrendingUp} label="Hadir sesuai jadwal" value={kepatuhan} />
+        <Stat icon={CalendarDays} label="Shift terjadwal" value={sum('dijadwalkan')} tone="zinc" />
+        <Stat icon={UserX} label="Alpha (tidak hadir tanpa kabar)" value={sum('alpha')} tone={sum('alpha') ? 'red' : 'zinc'} />
+        <Stat icon={ClipboardX} label="DS belum isi absensi" value={kosong.length} tone={kosong.length ? 'red' : 'zinc'} />
       </div>
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card !mb-0">
-          <b className="block mb-3">Kepatuhan per DS</b>
+          <b className="block mb-3">Hadir sesuai jadwal per DS</b>
           {d.rows.length === 0 && <Kosong teks="Belum ada DS" hint="Buat DS di tab Kelola DS & Captain." />}
           {d.rows.map((x) => {
             const p = x.terisi ? Math.round((100 * x.patuh) / x.terisi) : 0
@@ -134,12 +135,12 @@ export function Dashboard() {
           })}
         </div>
         <div className="card !mb-0">
-          <b className="block mb-3">Distribusi kehadiran</b>
+          <b className="block mb-3">Rincian kehadiran</b>
           {(() => {
             const seg = (['hadir', 'alpha', 'izin', 'sakit', 'tukar', 'pengganti'] as const).map((k) => ({ k, n: r.rows.reduce((a, x) => a + x[k], 0) }))
             const warna: Record<string, string> = { hadir: 'bg-zinc-900', alpha: 'bg-red-500', izin: 'bg-zinc-400', sakit: 'bg-zinc-300', tukar: 'bg-purple-300', pengganti: 'bg-brand' }
             const total = seg.reduce((a, s) => a + s.n, 0)
-            if (!total) return <Kosong teks="Belum ada actual di periode ini" hint="Data muncul setelah Captain mengisi Daily Report." />
+            if (!total) return <Kosong teks="Belum ada data kehadiran di periode ini" hint="Data muncul setelah Captain mengisi absensi harian." />
             return (
               <>
                 <div className="flex h-4 rounded-full overflow-hidden mb-4">
@@ -161,11 +162,11 @@ export function Dashboard() {
       </div>
       {kosong.length > 0 && (
         <div className="bg-red-50 border border-red-300 rounded p-3 mb-4 text-sm">
-          <b>DS belum isi actual:</b>
+          <b>DS yang belum mengisi absensi:</b>
           <ul className="list-disc ml-5">
             {kosong.map((x) => (
               <li key={x.ds_id}>
-                {x.ds_nama}: {x.hari_belum_isi} hari belum diisi (terakhir input {jam(x.terakhir_input)})
+                {x.ds_nama}: {x.hari_belum_isi} hari belum diisi (terakhir mengisi: {jam(x.terakhir_input)})
               </li>
             ))}
           </ul>
@@ -173,15 +174,15 @@ export function Dashboard() {
       )}
       <div className="card">
         <div className="flex justify-between mb-2">
-          <b>Kepatuhan per DS</b>
+          <b>Ringkasan per DS</b>
           <button className="btn2" onClick={() => download(`ringkasan-ds_${from}_${to}.csv`, toCsv(d.rows.map((x) => ({ ...x, kepatuhan: pct(x) }))))}>
-            Ekspor CSV
+            Unduh CSV
           </button>
         </div>
         <DsTable rows={d.rows} />
       </div>
       <div className="grid md:grid-cols-2 gap-4">
-        <Top title="Langganan alpha" rows={r.rows} k="alpha" />
+        <Top title="Sering tidak hadir (Alpha)" rows={r.rows} k="alpha" />
         <Top title="Sering jadi pengganti" rows={r.rows} k="pengganti" />
       </div>
       <div className="grid md:grid-cols-2 gap-4">
@@ -190,7 +191,7 @@ export function Dashboard() {
           <ul className="text-sm mt-1 space-y-1">
             {pindah.rows.map((p: Any, i: number) => (
               <li key={i}>
-                {p.rider?.nama}: {p.dari?.nama ?? 'kolam bebas'} → {p.ke?.nama ?? 'kolam bebas'} <span className="text-zinc-400">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
+                {p.rider?.nama}: {p.dari?.nama ?? 'belum punya DS'} → {p.ke?.nama ?? 'belum punya DS'} <span className="text-zinc-400">oleh {p.oleh?.nama ?? '-'} · {jam(p.waktu)}</span>
               </li>
             ))}
           </ul>
@@ -248,8 +249,8 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
           </select>
         )}
         <input className="inp" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn2 ml-auto" onClick={() => download(`rekap-rider_${from}_${to}.csv`, toCsv(rRows as unknown as Record<string, unknown>[]))}>Ekspor rekap rider</button>
-        <button className="btn2" onClick={() => download(`actual-detail_${from}_${to}.csv`, toCsv(flat))}>Ekspor detail actual</button>
+        <button className="btn2 ml-auto" onClick={() => download(`rekap-rider_${from}_${to}.csv`, toCsv(rRows as unknown as Record<string, unknown>[]))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh rekap rider</button>
+        <button className="btn2" onClick={() => download(`actual-detail_${from}_${to}.csv`, toCsv(flat))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh detail absensi</button>
       </div>
       <Err msg={d.err || r.err || det.err} />
       <div className="card"><DsTable rows={dsRows} /></div>
@@ -257,7 +258,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
         <b>Rekap per rider</b>
         <table className="tbl mt-2">
           <thead>
-            <tr><th>Rider</th><th>DS</th><th>Dijadwalkan</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th></tr>
+            <tr><th>Rider</th><th>DS</th><th>Terjadwal</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th></tr>
           </thead>
           <tbody>
             {rRows.map((x) => (
@@ -270,7 +271,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
         </table>
       </div>
       <div className="card overflow-x-auto">
-        <b>Detail actual ({flat.length}{flat.length === 1000 ? '+' : ''} baris)</b>
+        <b>Detail absensi ({flat.length}{flat.length === 1000 ? '+' : ''} baris)</b>
         <table className="tbl mt-2">
           <thead>
             <tr><th>Tanggal</th><th>DS</th><th>Rider</th><th>Status</th><th>Terkait</th><th>Penjelasan</th><th>Diinput</th></tr>
@@ -284,7 +285,7 @@ export function Rekap({ me, ds }: { me: Me; ds: Ds | null }) {
             ))}
           </tbody>
         </table>
-        {det.rows.length > 200 && <p className="text-xs text-zinc-500 mt-1">Menampilkan 200 pertama — ekspor CSV untuk semuanya.</p>}
+        {det.rows.length > 200 && <p className="text-xs text-zinc-500 mt-1">Menampilkan 200 baris pertama. Unduh CSV untuk melihat semuanya.</p>}
       </div>
       {dsId && <Kunci dsId={dsId} />}
     </div>
@@ -297,7 +298,8 @@ function Kunci({ dsId }: { dsId: string }) {
   const weeks = Array.from({ length: 6 }, (_, i) => addDays(monday(today()), -7 * (i + 1)))
   return (
     <div className="card">
-      <b>Kunci periode mingguan</b>
+      <b>Kunci absensi mingguan</b>
+      <p className="text-xs text-zinc-500 mt-0.5">Setelah dikunci, absensi minggu itu tidak bisa diubah lagi supaya hitungan gaji tidak berubah.</p>
       <ul className="mt-2 text-sm space-y-1">
         {weeks.map((w) => {
           const locked = kunci.rows.some((k) => k.minggu_mulai === w)
@@ -310,7 +312,7 @@ function Kunci({ dsId }: { dsId: string }) {
                 <button
                   className="btn2"
                   onClick={async () => {
-                    if (confirm('Kunci actual minggu ini? Tidak bisa diubah lagi.') && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
+                    if (confirm('Kunci absensi minggu ini? Setelah dikunci tidak bisa diubah lagi.') && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
                   }}
                 >
                   Kunci
