@@ -49,11 +49,15 @@ const ramah = (m: string) =>
   : /duplicate key/i.test(m) ? 'Data sudah ada. Kode MTR, email, dan nama DS tidak boleh kembar.'
   : /failed to fetch|network/i.test(m) ? 'Koneksi bermasalah. Periksa internet Anda lalu coba lagi.'
   : /invalid input syntax/i.test(m) ? 'Isian tidak valid. Periksa lagi data yang dimasukkan.'
+  : /could not find the (table|function)|schema cache|(function|relation) .* does not exist/i.test(m) ? 'Fitur ini belum aktif di database. Jalankan migrasi SQL terbaru di Supabase, lalu muat ulang halaman.'
+  : /jwt (expired|invalid)|invalid jwt|not authenticated/i.test(m) ? 'Sesi Anda berakhir. Muat ulang halaman lalu masuk lagi.'
+  : /violates foreign key/i.test(m) ? 'Data ini masih terhubung dengan data lain, jadi belum bisa diubah atau dihapus.'
+  : /violates (check|not-null)|null value in column/i.test(m) ? 'Ada isian wajib yang kosong atau di luar batas yang diizinkan.'
   : m
 
 export async function ok(p: PromiseLike<{ error: { message: string } | null }>) {
   const { error } = await p
-  if (error) toast(ramah(error.message))
+  if (error) toast(error.message)
   return !error
 }
 
@@ -62,7 +66,7 @@ type Toast = { id: number; msg: string; tone: 'ok' | 'err' }
 let pushToast: (t: Toast) => void = () => {}
 let toastId = 0
 const emit = (msg: string, tone: Toast['tone']) => pushToast({ id: ++toastId, msg, tone })
-export const toast = Object.assign((msg: string) => emit(msg, 'err'), { ok: (msg: string) => emit(msg, 'ok') })
+export const toast = Object.assign((msg: string) => emit(ramah(msg), 'err'), { ok: (msg: string) => emit(msg, 'ok') })
 
 // ── dialog konfirmasi bertema (menggantikan confirm bawaan browser) ──
 type Tanya = { msg: string; judul: string; ya: string; bahaya: boolean; selesai: (v: boolean) => void }
@@ -459,7 +463,7 @@ export function Select({ value, onChange, opsi, placeholder = 'Pilih…', classN
 }
 
 export const Err = ({ msg }: { msg: string }) =>
-  msg ? <p className="text-danger text-sm mb-3 bg-danger-soft border border-danger/30 rounded-md px-3 py-2">{msg}</p> : null
+  msg ? <p className="text-danger text-sm mb-3 bg-danger-soft border border-danger/30 rounded-md px-3 py-2">{ramah(msg)}</p> : null
 
 // Kolom isian berlabel + penjelasan fungsinya, supaya jelas untuk apa tiap kolom
 export const Field = ({ label, hint, children, className = '' }: { label: string; hint?: string; children: ReactNode; className?: string }) => (

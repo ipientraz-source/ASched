@@ -384,7 +384,7 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
     if (langgar.length) toast(`${langgar.length} kali rider terpaksa pindah shift tanpa libur dulu supaya kebutuhan terpenuhi (mulai ${hari(langgar[0].tanggal)}). Periksa lagi jadwalnya.`)
   }
 
-  // Salin periode sebelumnya yang panjangnya sama (mis. 14 hari terakhir sebelum periode ini), termasuk libur terkunci
+  // Salin periode sebelumnya yang panjangnya sama (mis. 14 hari terakhir sebelum periode ini), termasuk Off bergembok
   const salinSebelumnya = async () => {
     const n = days.length
     const { data, error } = await ambilJadwal(ds.id, addDays(dari, -n), addDays(dari, -1))
@@ -438,7 +438,7 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
             <button className="btn2" onClick={salinSebelumnya}><Copy size={14} />Salin periode sebelumnya</button>
             <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">Opsi susun otomatis:</span>
-              <label className="flex cursor-pointer items-center gap-1.5" title="Pagi/siang yang sudah Anda isi tidak diubah; otomatis hanya mengisi sisanya. Libur terkunci (gembok) selalu dihormati, dicentang atau tidak.">
+              <label className="flex cursor-pointer items-center gap-1.5" title="Pagi/siang yang sudah Anda isi tidak diubah; otomatis hanya mengisi sisanya. Sel Off bergembok selalu dihormati, dicentang atau tidak.">
                 <input type="checkbox" checked={pertahankan} onChange={(e) => setPertahankan(e.target.checked)} /> Pertahankan shift yang sudah diisi
               </label>
               <label className="flex cursor-pointer items-center gap-1.5" title="Menambah rider di atas kebutuhan client pada hari yang sering ada absen, berdasarkan pola 8 minggu terakhir.">
@@ -512,7 +512,7 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
                     const v = g[k] ?? ''
                     return (
                       <td key={d} className={`border-b border-border/60 py-2 text-center transition-colors group-hover:bg-primary-soft/60 ${padat ? 'px-0.5' : 'px-2'} ${d === today() ? 'bg-primary-soft/40' : ''}`}>
-                        <Pil v={v} ringkas={padat} title="Klik untuk mengganti: libur → pagi → siang → libur terkunci (cuti/izin, tidak diisi otomatis)" klik={editable ? () => setG({ ...g, [k]: SIKLUS[(SIKLUS.indexOf(v) + 1) % SIKLUS.length] }) : undefined} />
+                        <Pil v={v} ringkas={padat} title="Klik untuk mengganti: kosong (libur) → pagi → siang → Off bergembok (cuti/izin, tidak diisi otomatis)" klik={editable ? () => setG({ ...g, [k]: SIKLUS[(SIKLUS.indexOf(v) + 1) % SIKLUS.length] }) : undefined} />
                       </td>
                     )
                   })}
@@ -547,7 +547,7 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
       <p className="mt-2 text-xs text-muted-foreground">
         {editable && (
           <>
-            Warna baris kebutuhan: hijau pas, kuning kurang, biru lebih tapi masih dalam jatah cadangan, merah kelebihan. Jadwal tetap bisa disimpan. Klik sel untuk mengganti: libur, pagi, siang, lalu <b>libur terkunci</b> (gembok) untuk cuti atau izin yang sudah disepakati, yang tidak akan diisi otomatis. "Susun otomatis" membagi shift sesuai kebutuhan tiap hari secara adil dan membaca jadwal 28 hari sebelumnya yang sudah tersimpan (simpan periode sebelumnya dulu). Aturannya: maksimal 6 hari kerja per minggu dan 6 hari berturut-turut, shift hanya berganti setelah libur, dan setelah libur rider melanjutkan shift sebelumnya. Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal. Pindah periode sebelum menyimpan akan membuang draf.{' '}
+            Warna baris kebutuhan: hijau pas, kuning kurang, biru lebih tapi masih dalam jatah cadangan, merah kelebihan. Jadwal tetap bisa disimpan. Klik sel untuk mengganti: libur, pagi, siang, lalu <b>Off</b> (gembok) untuk cuti atau izin yang sudah disepakati, yang tidak akan diisi otomatis. "Susun otomatis" membagi shift sesuai kebutuhan tiap hari secara adil dan membaca jadwal 28 hari sebelumnya yang sudah tersimpan (simpan periode sebelumnya dulu). Aturannya: maksimal 6 hari kerja per minggu dan 6 hari berturut-turut, shift hanya berganti setelah libur, dan setelah libur rider melanjutkan shift sebelumnya. Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal. Pindah periode sebelum menyimpan akan membuang draf.{' '}
           </>
         )}
         Gambar dan PDF dibuat langsung di browser dan tidak disimpan di database.
