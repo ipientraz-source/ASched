@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, hari, useRows, ok, Err, RiderPick, type Ds, type Me, type Rider } from './lib'
+import { sb, today, monday, hari, useRows, ok, Err, Kosong, RiderPick, type Ds, type Me, type Rider } from './lib'
 
 type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null }
 type Catat = (rider: string, status: string, backup?: string, teks?: string) => Promise<boolean>
@@ -86,7 +86,7 @@ function DailyInner({ ds }: { ds: Ds }) {
             hapus={hapus}
           />
         ))}
-        {!shown.length && <p className="text-zinc-500">Tidak ada rider terjadwal pada tanggal ini.</p>}
+        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider terjadwal pada tanggal ini" hint="Susun jadwal di tab Jadwal DS Saya, atau tambahkan rider pengganti di bawah." /></div>}
       </div>
       <TambahPengganti
         kandidat={riders.rows.filter((r) => !listed.some((l) => l.id === r.id))}

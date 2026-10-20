@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
+import { Inbox } from 'lucide-react'
 
 export const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
 
@@ -152,4 +153,17 @@ export function RiderPick({
   )
 }
 
-export const Err = ({ msg }: { msg: string }) => (msg ? <p className="text-red-600 text-sm mb-2">{msg}</p> : null)
+export const Err = ({ msg }: { msg: string }) =>
+  msg ? <p className="text-red-600 text-sm mb-3 bg-red-50 border border-red-200 rounded-md px-3 py-2">{msg}</p> : null
+
+export const Logo = ({ small }: { small?: boolean }) => (
+  <div className={`${small ? 'size-9 text-base' : 'size-12 text-xl'} shrink-0 rounded-xl bg-brand text-white font-display font-bold flex items-center justify-center shadow-lg shadow-brand/30`}>D</div>
+)
+
+export const Kosong = ({ teks, hint }: { teks: string; hint?: string }) => (
+  <div className="flex flex-col items-center text-center py-10 text-zinc-500">
+    <div className="size-12 rounded-full bg-zinc-100 flex items-center justify-center mb-3"><Inbox size={22} className="text-zinc-400" /></div>
+    <p className="font-semibold text-zinc-700">{teks}</p>
+    {hint && <p className="text-sm mt-1 max-w-xs">{hint}</p>}
+  </div>
+)

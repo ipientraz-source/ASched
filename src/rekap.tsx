@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, Err, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, Err, Kosong, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
 
 type DsRow = {
@@ -113,6 +113,51 @@ export function Dashboard() {
         <div className="stat"><b>{sum('dijadwalkan')}</b><span>Shift dijadwalkan</span></div>
         <div className="stat"><b className={sum('alpha') ? '!text-red-600' : ''}>{sum('alpha')}</b><span>Alpha</span></div>
         <div className="stat"><b className={kosong.length ? '!text-red-600' : ''}>{kosong.length}</b><span>DS belum isi actual</span></div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+        <div className="card !mb-0">
+          <b className="block mb-3">Kepatuhan per DS</b>
+          {d.rows.length === 0 && <Kosong teks="Belum ada DS" hint="Buat DS di tab Kelola DS & Captain." />}
+          {d.rows.map((x) => {
+            const p = x.terisi ? Math.round((100 * x.patuh) / x.terisi) : 0
+            return (
+              <div key={x.ds_id} className="mb-3 last:mb-0">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="font-medium">{x.ds_nama}</span>
+                  <span className="font-mono">{pct(x)}</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-zinc-100 overflow-hidden">
+                  <div className={`h-full rounded-full ${p >= 90 ? 'bg-brand' : p >= 70 ? 'bg-brand/60' : 'bg-red-500'}`} style={{ width: `${p}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="card !mb-0">
+          <b className="block mb-3">Distribusi kehadiran</b>
+          {(() => {
+            const seg = (['hadir', 'alpha', 'izin', 'sakit', 'tukar', 'pengganti'] as const).map((k) => ({ k, n: r.rows.reduce((a, x) => a + x[k], 0) }))
+            const warna: Record<string, string> = { hadir: 'bg-zinc-900', alpha: 'bg-red-500', izin: 'bg-zinc-400', sakit: 'bg-zinc-300', tukar: 'bg-purple-300', pengganti: 'bg-brand' }
+            const total = seg.reduce((a, s) => a + s.n, 0)
+            if (!total) return <Kosong teks="Belum ada actual di periode ini" hint="Data muncul setelah Captain mengisi Daily Report." />
+            return (
+              <>
+                <div className="flex h-4 rounded-full overflow-hidden mb-4">
+                  {seg.filter((s) => s.n).map((s) => <div key={s.k} className={warna[s.k]} style={{ width: `${(100 * s.n) / total}%` }} title={`${s.k}: ${s.n}`} />)}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  {seg.map((s) => (
+                    <div key={s.k} className="flex items-center gap-2">
+                      <span className={`size-2.5 rounded-full ${warna[s.k]}`} />
+                      <span className="capitalize text-zinc-600">{s.k}</span>
+                      <span className="font-mono font-semibold ml-auto">{s.n}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
+        </div>
       </div>
       {kosong.length > 0 && (
         <div className="bg-red-50 border border-red-300 rounded p-3 mb-4 text-sm">

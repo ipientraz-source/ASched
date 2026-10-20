@@ -28,6 +28,8 @@ h1, h2, h3 { font-family: var(--font-display); }
   .tbl td { @apply px-3 py-2 border-b border-zinc-100; }
   .tbl tbody tr:hover { @apply bg-brand-soft/50; }
   .badge { @apply inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .nav { @apply w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left text-zinc-400 hover:bg-white/10 hover:text-white transition-colors; }
+  .nav-on { @apply bg-brand text-white shadow-lg shadow-brand/30 hover:bg-brand; }
   .tab { @apply px-3.5 py-1.5 text-sm font-semibold rounded-md text-zinc-600 hover:bg-zinc-100 whitespace-nowrap; }
   .tab-on { @apply bg-brand text-white hover:bg-brand; }
 }
