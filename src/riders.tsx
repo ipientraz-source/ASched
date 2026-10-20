@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, useRows, ok, Err, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { sb, useRows, ok, Err, Kosong, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -11,10 +11,11 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
   const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
   const dsNama = (id: string | null) => dsl.rows.find((d) => d.id === id)?.nama ?? '—'
 
-  const shown = rs.rows.filter(
+  const orang = rs.rows.filter((r) => r.peran !== 'super_admin') // super-admin bukan rider — dikelola di Kelola DS & Captain
+  const shown = orang.filter(
     (r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()) && (!fds || (fds === '-' ? !r.ds_id : r.ds_id === fds)),
   )
-  const aktif = rs.rows.filter((r) => r.status === 'aktif').length
+  const aktif = orang.filter((r) => r.status === 'aktif').length
 
   const setStatus = async (r: Rider) => {
     if (await ok(sb.from('riders').update({ status: r.status === 'aktif' ? 'nonaktif' : 'aktif' }).eq('id', r.id))) rs.reload()
@@ -26,9 +27,9 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
   return (
     <div>
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="stat"><b>{rs.rows.length}</b><span>Total rider</span></div>
+        <div className="stat"><b>{orang.length}</b><span>Total rider</span></div>
         <div className="stat"><b>{aktif}</b><span>Aktif</span></div>
-        <div className="stat"><b>{rs.rows.filter((r) => !r.ds_id && r.peran === 'rider').length}</b><span>Kolam bebas</span></div>
+        <div className="stat"><b>{orang.filter((r) => !r.ds_id && r.peran === 'rider').length}</b><span>Kolam bebas (belum punya DS)</span></div>
       </div>
       <div className="flex flex-wrap gap-2 mb-3">
         <input className="inp" placeholder="cari nama / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -48,6 +49,11 @@ export function DataRider({ me, ds }: { me: Me; ds: Ds | null }) {
         )}
       </div>
       <Err msg={rs.err} />
+      {!shown.length && (
+        <div className="card">
+          <Kosong teks={orang.length ? 'Tidak ada rider yang cocok' : 'Belum ada rider'} hint={orang.length ? 'Ubah kata kunci atau filter DS.' : 'Import CSV di bawah, atau tambah rider satuan.'} />
+        </div>
+      )}
       <div className="overflow-x-auto mb-4">
         <table className="tbl">
           <thead>
@@ -151,7 +157,7 @@ function ImportCsv({ done }: { done: () => void }) {
           Unduh template
         </button>
       </p>
-      <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-zinc-500 file:mr-3 file:rounded-md file:border file:border-zinc-300 file:bg-white file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:border-ink" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
       {hasil && (
         <div className="mt-2 text-sm">
           <p>
