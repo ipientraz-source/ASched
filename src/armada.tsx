@@ -1,0 +1,324 @@
+// Armada (Fleet management): data EV, servis rutin, laporan kerusakan, pindah DS.
+// Super-admin kelola semua; Arcon kelola penuh di DS yang dipegang; Captain melihat motor DS-nya dan melaporkan kerusakan.
+import { useState } from 'react'
+import { AlertTriangle, Bike, Wrench, Warehouse, X } from 'lucide-react'
+import { sb, today, useRows, ok, toast, konfirmasi, Err, Field, Select, Stat, Kosong, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
+import { angka, BadgeStatus, rupiah, ServisBerikutnya, tgl, type Motor, type Pindah, type Rusak, type Servis } from './armada-lib'
+import { FormLapor, FormServis, ListRusak, namaPelapor, TabelServis } from './armada-catatan'
+
+const STATUS = [{ value: '', label: 'Semua status' }, { value: 'dipakai', label: 'Dipakai' }, { value: 'di gudang', label: 'Di gudang' }, { value: 'perbaikan', label: 'Perbaikan' }]
+
+export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[] }) {
+  const kelola = me.peran === 'super_admin' || me.peran === 'arcon'
+  const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
+  const mts = useRows<Motor>(() => sb.from('motor').select('*').order('kode_motor').limit(1000), [])
+  const rid = useRows<Rider>(() => sb.from('riders').select('*').order('nama').limit(1000), [])
+  const srv = useRows<Servis>(() => sb.from('servis_motor').select('*').order('tanggal', { ascending: false }).limit(1000), [])
+  const rsk = useRows<Rusak>(() => sb.from('kerusakan_motor').select('*').order('tanggal', { ascending: false }).limit(1000), [])
+  const pnd = useRows<Pindah>(() => sb.from('perpindahan_motor').select('*').order('waktu', { ascending: false }).limit(500), [])
+  const [bagian, setBagian] = useState<'motor' | 'servis' | 'kerusakan'>('motor')
+  const [pilih, setPilih] = useState<string | null>(null)
+  const [fds, setFds] = useState('')
+  const reloadSemua = () => { mts.reload(); srv.reload(); rsk.reload(); pnd.reload() }
+
+  // DS yang boleh dipakai untuk menambah/memindah motor
+  const dsBoleh = me.peran === 'super_admin' ? dsl.rows : me.peran === 'arcon' ? dsList : ds ? [ds] : []
+  const dsNama = (id: string | null) => dsl.rows.find((d) => d.id === id)?.nama ?? '–'
+  const motorKode = (id: string) => mts.rows.find((m) => m.id === id)?.kode_motor ?? '?'
+  const dsMotor = (id: string) => mts.rows.find((m) => m.id === id)?.ds_id ?? null
+  const pelapor = namaPelapor(rid.rows)
+
+  const hari = today()
+  const terbuka = rsk.rows.filter((r) => r.status !== 'selesai').length
+  const terlambat = mts.rows.filter((m) => m.servis_berikutnya && m.servis_berikutnya < hari).length
+  const jml = (s: Motor['status']) => mts.rows.filter((m) => m.status === s).length
+  const detail = mts.rows.find((m) => m.id === pilih) ?? null
+
+  return (
+    <div>
+      <Err msg={mts.err || srv.err || rsk.err || dsl.err || rid.err || pnd.err} />
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Stat icon={Bike} label="Total motor" value={mts.rows.length} />
+        <Stat icon={Bike} label="Sedang dipakai" value={jml('dipakai')} tone="zinc" />
+        <Stat icon={Warehouse} label="Di gudang" value={jml('di gudang')} tone="zinc" />
+        <Stat icon={Wrench} label="Servis terlambat" value={terlambat} tone={terlambat ? 'red' : 'zinc'} />
+        <Stat icon={AlertTriangle} label="Laporan terbuka" value={terbuka} tone={terbuka ? 'red' : 'zinc'} />
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {([['motor', 'Motor'], ['servis', 'Riwayat servis'], ['kerusakan', 'Kerusakan']] as const).map(([k, l]) => (
+          <button key={k} type="button" className={`tab ${bagian === k ? 'tab-on' : ''}`} onClick={() => setBagian(k)}>{l}{k === 'kerusakan' && terbuka > 0 ? ` (${terbuka})` : ''}</button>
+        ))}
+        {dsBoleh.length > 1 && (
+          <Select className="ml-auto w-56" value={fds} onChange={setFds} opsi={[{ value: '', label: 'Semua DS' }, ...dsBoleh.map((d) => ({ value: d.id, label: d.nama }))]} />
+        )}
+      </div>
+
+      {bagian === 'motor' && (
+        <BagianMotor
+          motors={mts.rows.filter((m) => !fds || m.ds_id === fds)} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={rid.rows} pilih={pilih} setPilih={setPilih} detail={detail}
+          servis={srv.rows} rusak={rsk.rows} pindah={pnd.rows} pelapor={pelapor} reload={reloadSemua}
+        />
+      )}
+      {bagian === 'servis' && <BagianServis rows={srv.rows.filter((s) => !fds || dsMotor(s.motor_id) === fds)} motorKode={motorKode} />}
+      {bagian === 'kerusakan' && (
+        <BagianRusak rows={rsk.rows.filter((r) => !fds || dsMotor(r.motor_id) === fds)} motorKode={motorKode} pelapor={pelapor} kelola={kelola} reload={reloadSemua} />
+      )}
+    </div>
+  )
+}
+
+// ───────── Motor ─────────
+function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPilih, detail, servis, rusak, pindah, pelapor, reload }: {
+  motors: Motor[]; me: Me; kelola: boolean; dsBoleh: Ds[]; dsNama: (id: string | null) => string; riders: Rider[]; pilih: string | null; setPilih: (id: string | null) => void
+  detail: Motor | null; servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; reload: () => void
+}) {
+  const [q, setQ] = useState('')
+  const [fst, setFst] = useState('')
+  const [tambah, setTambah] = useState(false)
+  const riderNama = (id: string | null) => riders.find((r) => r.id === id)?.nama ?? '–'
+  const tampil = motors.filter((m) => (!fst || m.status === fst) && `${m.kode_motor} ${m.plat_nomor ?? ''} ${m.merek ?? ''} ${m.model ?? ''}`.toLowerCase().includes(q.toLowerCase()))
+  const pg = usePage(tampil, [q, fst, motors.length])
+
+  return (
+    <div>
+      {tambah && (
+        <div className="card">
+          <div className="mb-3 flex items-center justify-between"><b>Tambah motor</b><button className="btn2" onClick={() => setTambah(false)}><X size={14} />Tutup</button></div>
+          <FormMotor dsBoleh={dsBoleh} riders={riders} selesai={() => { setTambah(false); reload() }} />
+        </div>
+      )}
+      {detail && (
+        <DetailMotor
+          key={detail.id} m={detail} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={riders} riderNama={riderNama}
+          servis={servis.filter((s) => s.motor_id === detail.id)} rusak={rusak.filter((r) => r.motor_id === detail.id)} pindah={pindah.filter((p) => p.motor_id === detail.id)}
+          pelapor={pelapor} tutup={() => setPilih(null)} reload={reload}
+        />
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input className="inp w-64 max-w-full" placeholder="Cari kode, plat, merek, atau model" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Select className="w-44" value={fst} onChange={setFst} opsi={STATUS} />
+        <span className="text-sm text-muted-foreground">{tampil.length} motor</span>
+        {kelola && <button className="btn ml-auto" onClick={() => setTambah(true)}>Tambah motor</button>}
+      </div>
+
+      <div className="card !p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="tbl">
+            <thead><tr><th>Kode</th><th>Plat</th><th>Model</th><th>DS</th><th>Pemegang</th><th>Status</th><th>Servis berikutnya</th><th /></tr></thead>
+            <tbody>
+              {pg.rows.map((m) => (
+                <tr key={m.id} className={m.id === pilih ? 'bg-primary-soft/60' : ''}>
+                  <td className="font-mono font-medium">{m.kode_motor}</td>
+                  <td>{m.plat_nomor ?? '–'}</td>
+                  <td>{[m.merek, m.model, m.tahun].filter(Boolean).join(' ') || '–'}</td>
+                  <td>{dsNama(m.ds_id)}</td>
+                  <td>{riderNama(m.dipegang_oleh)}</td>
+                  <td><BadgeStatus s={m.status} /></td>
+                  <td><ServisBerikutnya m={m} /></td>
+                  <td className="text-right"><button className="btn2" onClick={() => setPilih(m.id === pilih ? null : m.id)}>{m.id === pilih ? 'Tutup' : 'Detail'}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!tampil.length && <Kosong teks={motors.length ? 'Tidak ada motor yang cocok.' : 'Belum ada motor.'} hint={kelola ? 'Klik Tambah motor untuk mulai mendata.' : 'Super-admin atau Arcon yang menambahkan data motor.'} />}
+        <div className="p-4"><Pagination {...pg} /></div>
+      </div>
+    </div>
+  )
+}
+
+// Form tambah / ubah data motor. DS tidak bisa diubah di sini (pakai Pindah DS) supaya ada alasan dan riwayatnya.
+function FormMotor({ awal, dsBoleh, riders, selesai }: { awal?: Motor; dsBoleh: Ds[]; riders: Rider[]; selesai: () => void }) {
+  const [f, setF] = useState({
+    kode: awal?.kode_motor ?? '', ds: awal?.ds_id ?? dsBoleh[0]?.id ?? '', plat: awal?.plat_nomor ?? '', merek: awal?.merek ?? '', model: awal?.model ?? '', tahun: awal?.tahun ? String(awal.tahun) : '',
+    warna: awal?.warna ?? '', rangka: awal?.no_rangka ?? '', mesin: awal?.no_mesin ?? '', beli: awal?.tanggal_beli ?? '', interval: awal?.interval_servis_hari ? String(awal.interval_servis_hari) : '',
+    berikut: awal?.servis_berikutnya ?? '', pemegang: awal?.dipegang_oleh ?? '', catatan: awal?.catatan ?? '',
+  })
+  const set = (k: keyof typeof f) => (v: string) => setF((s) => ({ ...s, [k]: v }))
+  const kandidat = riders.filter((r) => r.peran === 'rider' && r.status === 'aktif' && r.ds_id === f.ds)
+
+  async function simpan() {
+    if (!f.kode.trim()) return toast('Isi kode motor dulu.')
+    if (!awal && !f.ds) return toast('Pilih DS motor ini.')
+    if (f.tahun && (angka(f.tahun) < 2000 || angka(f.tahun) > 2100)) return toast('Tahun tidak valid.')
+    if (f.interval && (angka(f.interval) < 1 || angka(f.interval) > 730)) return toast('Interval servis 1 sampai 730 hari.')
+    const isi = {
+      kode_motor: f.kode.trim(), plat_nomor: f.plat.trim() || null, merek: f.merek.trim() || null, model: f.model.trim() || null, tahun: f.tahun ? angka(f.tahun) : null,
+      warna: f.warna.trim() || null, no_rangka: f.rangka.trim() || null, no_mesin: f.mesin.trim() || null, tanggal_beli: f.beli || null,
+      interval_servis_hari: f.interval ? angka(f.interval) : null, servis_berikutnya: f.berikut || null, dipegang_oleh: f.pemegang || null, catatan: f.catatan.trim() || null,
+    }
+    const sukses = await ok(awal ? sb.from('motor').update(isi).eq('id', awal.id) : sb.from('motor').insert({ ...isi, ds_id: f.ds }))
+    if (!sukses) return
+    toast.ok(awal ? 'Data motor disimpan' : 'Motor ditambahkan')
+    selesai()
+  }
+
+  const input = (k: keyof typeof f, label: string, hint?: string, tipe = 'text') => (
+    <Field label={label} hint={hint}><input className="inp w-full" type={tipe} value={f[k]} onChange={(e) => set(k)(e.target.value)} /></Field>
+  )
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {input('kode', 'Kode motor', 'Nama unik motor ini, mis. EV-001.')}
+        <Field label="DS" hint={awal ? 'Untuk memindah DS pakai tombol Pindah DS.' : undefined}>
+          <Select value={f.ds} onChange={(v) => setF((s) => ({ ...s, ds: v, pemegang: '' }))} disabled={!!awal} placeholder="— pilih DS —" opsi={dsBoleh.map((d) => ({ value: d.id, label: d.nama }))} />
+        </Field>
+        {input('plat', 'Plat nomor')}
+        <Field label="Rider pemegang" hint="Rider di DS yang sama. Kosong = motor di gudang.">
+          <Select value={f.pemegang} onChange={set('pemegang')} cari opsi={[{ value: '', label: 'Tanpa pemegang' }, ...kandidat.map((r) => ({ value: r.id, label: `${r.nama} (${r.kode_mtr ?? '–'})` }))]} />
+        </Field>
+        {input('merek', 'Merek')}
+        {input('model', 'Model')}
+        {input('tahun', 'Tahun')}
+        {input('warna', 'Warna')}
+        {input('rangka', 'Nomor rangka')}
+        {input('mesin', 'Nomor mesin')}
+        {input('beli', 'Tanggal beli', undefined, 'date')}
+        {input('interval', 'Interval servis (hari)', 'Dipakai untuk menghitung servis berikutnya setelah Servis rutin dicatat.')}
+        {input('berikut', 'Servis berikutnya', 'Isi tanggal servis berikutnya; bisa diubah kapan saja.', 'date')}
+      </div>
+      <Field label="Catatan"><textarea className="inp w-full" rows={2} value={f.catatan} onChange={(e) => set('catatan')(e.target.value)} /></Field>
+      <button className="btn" onClick={simpan}>{awal ? 'Simpan perubahan' : 'Tambah motor'}</button>
+    </div>
+  )
+}
+
+function Info({ l, v }: { l: string; v: React.ReactNode }) {
+  return (
+    <div>
+      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{l}</div>
+      <div className="text-sm">{v || '–'}</div>
+    </div>
+  )
+}
+
+function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis, rusak, pindah, pelapor, tutup, reload }: {
+  m: Motor; me: Me; kelola: boolean; dsBoleh: Ds[]; dsNama: (id: string | null) => string; riders: Rider[]; riderNama: (id: string | null) => string
+  servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; tutup: () => void; reload: () => void
+}) {
+  const [mode, setMode] = useState<null | 'edit' | 'servis' | 'lapor' | 'pindah'>(null)
+  const selesai = () => { setMode(null); reload() }
+  const tombol = (k: NonNullable<typeof mode>, label: string) => (
+    <button className={mode === k ? 'btn' : 'btn2'} onClick={() => setMode(mode === k ? null : k)}>{label}</button>
+  )
+  const pemegang = riderNama(m.dipegang_oleh)
+
+  return (
+    <div className="card">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-bold font-mono">{m.kode_motor}</h3>
+        <BadgeStatus s={m.status} />
+        <span className="text-sm text-muted-foreground">{dsNama(m.ds_id)}</span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          {kelola && tombol('edit', 'Ubah data')}
+          {kelola && tombol('servis', 'Catat servis')}
+          {tombol('lapor', 'Lapor kerusakan')}
+          {kelola && tombol('pindah', 'Pindah DS')}
+          <button className="btn2" onClick={tutup}><X size={14} />Tutup</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Info l="Plat" v={m.plat_nomor} />
+        <Info l="Merek / model" v={[m.merek, m.model].filter(Boolean).join(' ')} />
+        <Info l="Tahun / warna" v={[m.tahun, m.warna].filter(Boolean).join(' · ')} />
+        <Info l="Pemegang" v={pemegang === '–' ? '' : pemegang} />
+        <Info l="Tanggal beli" v={m.tanggal_beli ? tgl(m.tanggal_beli) : ''} />
+        <Info l="No. rangka" v={m.no_rangka} />
+        <Info l="No. mesin" v={m.no_mesin} />
+        <Info l="Servis terakhir" v={m.servis_terakhir ? tgl(m.servis_terakhir) : ''} />
+        <Info l="Servis berikutnya" v={<ServisBerikutnya m={m} />} />
+        <Info l="Interval servis" v={m.interval_servis_hari ? `${m.interval_servis_hari} hari` : ''} />
+      </div>
+      {m.catatan && <p className="mt-3 text-sm text-muted-foreground">{m.catatan}</p>}
+
+      {mode && (
+        <div className="mt-4 rounded-xl border border-border bg-muted/40 p-4">
+          {mode === 'edit' && <FormMotor awal={m} dsBoleh={dsBoleh} riders={riders} selesai={selesai} />}
+          {mode === 'servis' && <FormServis motorId={m.id} selesai={selesai} />}
+          {mode === 'lapor' && <FormLapor motorId={m.id} me={me} selesai={selesai} />}
+          {mode === 'pindah' && <FormPindah m={m} dsBoleh={dsBoleh.filter((d) => d.id !== m.ds_id)} selesai={selesai} />}
+        </div>
+      )}
+
+      <div className="mt-5 space-y-5">
+        <section><b className="mb-2 block">Riwayat servis</b><TabelServis rows={servis} /></section>
+        <section><b className="mb-2 block">Laporan kerusakan</b><ListRusak rows={rusak} pelapor={pelapor} bisaProses={kelola} reload={reload} /></section>
+        {pindah.length > 0 && (
+          <section>
+            <b className="mb-2 block">Riwayat pemindahan DS</b>
+            <ul className="space-y-1 text-sm">
+              {pindah.map((p) => (
+                <li key={p.id}>{new Date(p.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}: {dsNama(p.dari_ds)} → {dsNama(p.ke_ds)} <span className="text-muted-foreground">({p.alasan})</span></li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FormPindah({ m, dsBoleh, selesai }: { m: Motor; dsBoleh: Ds[]; selesai: () => void }) {
+  const [ke, setKe] = useState('')
+  const [alasan, setAlasan] = useState('')
+  async function pindah() {
+    if (!ke) return toast('Pilih DS tujuan dulu.')
+    if (!alasan.trim()) return toast('Alasan pemindahan wajib diisi.')
+    const tujuan = dsBoleh.find((d) => d.id === ke)?.nama
+    if (!(await konfirmasi(`Motor ${m.kode_motor} dipindah ke ${tujuan}. Rider pemegang dilepas otomatis dan pemindahan tercatat di riwayat.`, { judul: 'Pindahkan motor?', ya: 'Pindahkan' }))) return
+    if (!(await ok(sb.rpc('pindah_motor', { p_motor: m.id, p_ke_ds: ke, p_alasan: alasan.trim() })))) return
+    toast.ok('Motor dipindahkan')
+    selesai()
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Syarat: tidak ada laporan kerusakan yang belum selesai, dan alasan wajib diisi. Rider pemegang dilepas otomatis. Arcon hanya bisa memindah antar DS yang dia pegang.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="DS tujuan"><Select value={ke} onChange={setKe} placeholder="— pilih DS tujuan —" opsi={dsBoleh.map((d) => ({ value: d.id, label: d.nama }))} /></Field>
+        <Field label="Alasan pemindahan"><input className="inp w-full" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Mis. DS asal kelebihan motor" /></Field>
+      </div>
+      <button className="btn" onClick={pindah}>Pindahkan motor</button>
+    </div>
+  )
+}
+
+// ───────── Riwayat servis (semua motor) ─────────
+function BagianServis({ rows, motorKode }: { rows: Servis[]; motorKode: (id: string) => string }) {
+  const pg = usePage(rows, [rows.length])
+  const total = rows.reduce((a, s) => a + s.biaya, 0)
+  return (
+    <div className="card">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <b>Riwayat servis</b>
+        <span className="text-sm text-muted-foreground">{rows.length} catatan · total biaya {rupiah(total)}</span>
+        <span className="ml-auto text-xs text-muted-foreground">Catat servis baru dari Detail motor.</span>
+      </div>
+      <TabelServis rows={pg.rows} motorNama={motorKode} />
+      <div className="mt-3"><Pagination {...pg} /></div>
+    </div>
+  )
+}
+
+// ───────── Kerusakan (semua motor) ─────────
+function BagianRusak({ rows, motorKode, pelapor, kelola, reload }: { rows: Rusak[]; motorKode: (id: string) => string; pelapor: (id: string | null) => string; kelola: boolean; reload: () => void }) {
+  const [saring, setSaring] = useState('terbuka')
+  const tampil = rows.filter((r) => (saring === 'semua' ? true : saring === 'terbuka' ? r.status !== 'selesai' : r.status === saring))
+  const pg = usePage(tampil, [saring, rows.length])
+  const total = tampil.reduce((a, r) => a + r.biaya, 0)
+  return (
+    <div className="card">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <b>Laporan kerusakan</b>
+        <Select className="w-48" value={saring} onChange={setSaring} opsi={[{ value: 'terbuka', label: 'Belum selesai' }, { value: 'dilaporkan', label: 'Dilaporkan' }, { value: 'diproses', label: 'Diproses' }, { value: 'selesai', label: 'Selesai' }, { value: 'semua', label: 'Semua' }]} />
+        <span className="text-sm text-muted-foreground">{tampil.length} laporan · total biaya {rupiah(total)}</span>
+        <span className="ml-auto text-xs text-muted-foreground">Laporan baru dibuat dari Detail motor.</span>
+      </div>
+      <ListRusak rows={pg.rows} motorNama={motorKode} pelapor={pelapor} bisaProses={kelola} reload={reload} />
+      <div className="mt-3"><Pagination {...pg} /></div>
+    </div>
+  )
+}
