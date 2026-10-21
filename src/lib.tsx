@@ -474,9 +474,9 @@ export const Field = ({ label, hint, children, className = '' }: { label: string
   </div>
 )
 
-// Ikon ORCA asli tanpa kotak. Bayangan tipis di sekelilingnya menjaga bagian putih tetap terlihat di latar terang.
+// Ikon ORCA (tile navy, cincin ber-outline putih): berkas yang sama dengan ikon tab browser
 export const Logo = ({ small }: { small?: boolean }) => (
-  <img src="/logo-ikon.png" alt="Dash ORCA" className={`${small ? 'size-9' : 'size-12'} shrink-0 object-contain [filter:drop-shadow(0_0_1px_rgba(0,0,0,0.55))]`} />
+  <img src="/favicon.svg" alt="Dash ORCA" className={`${small ? 'size-9' : 'size-12'} shrink-0 drop-shadow-md`} />
 )
 
 export const Kosong = ({ teks, hint }: { teks: string; hint?: string }) => (
