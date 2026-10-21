@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { UserCheck, UserMinus, Users } from 'lucide-react'
 import { cocokDs, namaDsBaru, ringkasPerRider, type Baris } from './impor'
-import { sb, useRows, ok, toast, Err, Kosong, Stat, Field, Select, usePage, Pagination, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
+import { sb, useRows, ok, toast, konfirmasi, Err, Kosong, Stat, Field, Select, usePage, Pagination, toCsv, download, parseCsv, type Ds, type Me, type Rider } from './lib'
 
 type Hasil = { inserted: number; updated: number; errors: { baris: number; pesan: string }[] }
 
@@ -29,7 +29,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
         <Stat icon={Users} label="Total rider" value={orang.length} />
         <Stat icon={UserCheck} label="Rider aktif" value={aktif} tone="zinc" />
         <Stat icon={UserMinus} label="Belum punya DS" value={orang.filter((r) => !r.ds_id && r.peran === 'rider').length} tone="zinc" />
@@ -70,7 +70,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
                 </td>
                 <td><span className="badge bg-muted text-foreground/80 capitalize">{r.peran.replace('_', '-')}</span></td>
                 <td>
-                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && r.ds_id !== ds?.id} onClick={() => setStatus(r)}>
+                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && (r.ds_id !== ds?.id || r.peran !== 'rider')} title={!sup && r.peran !== 'rider' ? 'Hanya Super-admin yang bisa mengubah status Arcon dan Captain' : undefined} onClick={() => setStatus(r)}>
                     {r.status}
                   </button>
                 </td>
@@ -217,7 +217,7 @@ function ImportCsv({ done, dsl }: { done: () => void; dsl: Ds[] }) {
           Unduh template
         </button>
       </p>
-      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:border-foreground/50" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
+      <input type="file" accept=".csv,text/csv" disabled={busy} className="block max-w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:border-foreground/50" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {rows.length > 0 && (
         <div className="mt-4">
           {absensi && (
@@ -309,7 +309,7 @@ function Tarik({ ds, done }: { ds: Ds; done: () => void }) {
               className="btn2 ml-auto"
               disabled={r.ds_id === ds.id}
               onClick={async () => {
-                if (confirm(`Tarik ${r.nama} dari ${r.ds_nama ?? 'belum punya DS'} ke ${ds.nama}?`) && (await ok(sb.rpc('tarik_rider', { p_rider: r.id })))) {
+                if ((await konfirmasi(`Tarik ${r.nama} dari ${r.ds_nama ?? 'belum punya DS'} ke ${ds.nama}?`, { judul: 'Tarik rider ke DS ini?', ya: 'Tarik' })) && (await ok(sb.rpc('tarik_rider', { p_rider: r.id })))) {
                   setRes([])
                   done()
                 }

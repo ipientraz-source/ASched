@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, konfirmasi, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
 import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
@@ -9,7 +9,7 @@ type DsRow = {
 }
 type RiderRow = {
   rider_id: string; kode_mtr: string | null; nama: string; ds_nama: string | null; dijadwalkan: number; hadir: number
-  alpha: number; izin: number; sakit: number; tukar: number; pengganti: number; belum_diisi: number
+  alpha: number; izin: number; sakit: number; tukar: number; pengganti: number; belum_diisi: number; potongan: number; insentif: number
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
@@ -241,7 +241,7 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
   const r = useRows<RiderRow>(() => sb.rpc('laporan_rider', { p_dari: from, p_sampai: to }), [from, to])
   const det = useRows<Any>(() => {
     const base = sb.from('actual_harian')
-      .select('tanggal,status,penjelasan,jam_input,rider:riders!actual_harian_rider_id_fkey(nama,kode_mtr),backup:riders!actual_harian_backup_untuk_id_fkey(nama),oleh:riders!actual_harian_diinput_oleh_fkey(nama),ds(nama)')
+      .select('tanggal,status,penjelasan,potongan,insentif,jam_input,rider:riders!actual_harian_rider_id_fkey(nama,kode_mtr),backup:riders!actual_harian_backup_untuk_id_fkey(nama),oleh:riders!actual_harian_diinput_oleh_fkey(nama),ds(nama)')
       .gte('tanggal', from).lte('tanggal', to).order('tanggal', { ascending: false }).limit(1000)
     return dsId ? base.eq('ds_id', dsId) : base
   }, [from, to, dsId])
@@ -250,7 +250,7 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
   const rRows = r.rows.filter((x) => (!dsNama || x.ds_nama === dsNama) && (x.nama + (x.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
   const flat = det.rows.map((x: Any) => ({
     tanggal: x.tanggal, ds: x.ds?.nama, kode_mtr: x.rider?.kode_mtr, rider: x.rider?.nama, status: x.status,
-    pengganti_untuk_atau_backup: x.backup?.nama ?? '', penjelasan: x.penjelasan ?? '', diinput_oleh: x.oleh?.nama ?? '', jam_input: x.jam_input,
+    pengganti_untuk_atau_backup: x.backup?.nama ?? '', potongan: x.potongan === true ? 'ya' : x.potongan === false ? 'tidak' : '', insentif: x.insentif ?? 0, penjelasan: x.penjelasan ?? '', diinput_oleh: x.oleh?.nama ?? '', jam_input: x.jam_input,
   }))
 
   const pgR = usePage(rRows, [q, dsId, from, to])
@@ -273,13 +273,14 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
         <b>Rekap per rider</b>
         <div className="overflow-x-auto"><table className="tbl mt-2">
           <thead>
-            <tr><th>Rider</th><th>DS</th><th>Terjadwal</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th></tr>
+            <tr><th>Rider</th><th>DS</th><th>Terjadwal</th><th>Hadir</th><th>Alpha</th><th>Izin</th><th>Sakit</th><th>Tukar</th><th>Pengganti</th><th>Belum diisi</th><th>Kena potongan</th><th>Insentif</th></tr>
           </thead>
           <tbody>
             {pgR.rows.map((x) => (
               <tr key={x.rider_id}>
                 <td>{x.nama} <span className="text-muted-foreground/70">{x.kode_mtr}</span></td><td>{x.ds_nama}</td><td>{x.dijadwalkan}</td><td>{x.hadir}</td>
                 <td className={x.alpha ? 'text-danger font-medium' : ''}>{x.alpha}</td><td>{x.izin}</td><td>{x.sakit}</td><td>{x.tukar}</td><td>{x.pengganti}</td><td>{x.belum_diisi}</td>
+                <td className={x.potongan ? 'text-danger font-medium' : ''}>{x.potongan}</td><td className={x.insentif ? 'text-success font-medium' : ''}>{x.insentif ? `Rp ${Number(x.insentif).toLocaleString('id-ID')}` : '–'}</td>
               </tr>
             ))}
           </tbody>
@@ -290,12 +291,12 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
         <b>Detail absensi ({flat.length}{flat.length === 1000 ? '+' : ''} baris)</b>
         <div className="overflow-x-auto"><table className="tbl mt-2">
           <thead>
-            <tr><th>Tanggal</th><th>DS</th><th>Rider</th><th>Status</th><th>Terkait</th><th>Penjelasan</th><th>Diinput</th></tr>
+            <tr><th>Tanggal</th><th>DS</th><th>Rider</th><th>Status</th><th>Terkait</th><th>Potongan</th><th>Insentif</th><th>Penjelasan</th><th>Diinput</th></tr>
           </thead>
           <tbody>
             {pgD.rows.map((x: Any, i: number) => (
               <tr key={i}>
-                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama}</td><td>{x.penjelasan}</td>
+                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama}</td><td>{x.potongan === true ? 'Ya' : x.potongan === false ? 'Tidak' : '–'}</td><td>{x.insentif ? `Rp ${Number(x.insentif).toLocaleString('id-ID')}` : '–'}</td><td>{x.penjelasan}</td>
                 <td className="text-xs">{x.oleh?.nama} · {jam(x.jam_input)}</td>
               </tr>
             ))}
@@ -332,7 +333,7 @@ function Kunci({ dsId, bisaBuka }: { dsId: string; bisaBuka: boolean }) {
                     <button
                       className="btn2 !px-2.5 !py-1 text-xs"
                       onClick={async () => {
-                        if (confirm('Buka kunci minggu ini? Absensi bisa diubah lagi dan hitungan gaji bisa ikut berubah. Pembukaan ini tercatat di log.') && (await ok(sb.rpc('buka_kunci', { p_ds: dsId, p_minggu: w })))) {
+                        if ((await konfirmasi('Absensi bisa diubah lagi dan hitungan gaji bisa ikut berubah. Pembukaan ini tercatat di log.', { judul: 'Buka kunci minggu ini?', ya: 'Buka kunci', bahaya: true })) && (await ok(sb.rpc('buka_kunci', { p_ds: dsId, p_minggu: w })))) {
                           toast.ok('Kunci dibuka. Jangan lupa kunci lagi setelah koreksi.')
                           kunci.reload()
                         }
@@ -346,7 +347,7 @@ function Kunci({ dsId, bisaBuka }: { dsId: string; bisaBuka: boolean }) {
                 <button
                   className="btn2"
                   onClick={async () => {
-                    if (confirm('Kunci absensi minggu ini? Setelah dikunci tidak bisa diubah lagi.') && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
+                    if ((await konfirmasi('Setelah dikunci, absensi tidak bisa diubah lagi.', { judul: 'Kunci absensi minggu ini?', ya: 'Kunci', bahaya: true })) && (await ok(sb.rpc('kunci_periode', { p_ds: dsId, p_minggu: w })))) kunci.reload()
                   }}
                 >
                   Kunci

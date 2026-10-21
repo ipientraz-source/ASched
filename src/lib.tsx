@@ -49,11 +49,15 @@ const ramah = (m: string) =>
   : /duplicate key/i.test(m) ? 'Data sudah ada. Kode MTR, email, dan nama DS tidak boleh kembar.'
   : /failed to fetch|network/i.test(m) ? 'Koneksi bermasalah. Periksa internet Anda lalu coba lagi.'
   : /invalid input syntax/i.test(m) ? 'Isian tidak valid. Periksa lagi data yang dimasukkan.'
+  : /could not find the (table|function)|schema cache|(function|relation) .* does not exist/i.test(m) ? 'Fitur ini belum aktif di database. Jalankan migrasi SQL terbaru di Supabase, lalu muat ulang halaman.'
+  : /jwt (expired|invalid)|invalid jwt|not authenticated/i.test(m) ? 'Sesi Anda berakhir. Muat ulang halaman lalu masuk lagi.'
+  : /violates foreign key/i.test(m) ? 'Data ini masih terhubung dengan data lain, jadi belum bisa diubah atau dihapus.'
+  : /violates (check|not-null)|null value in column/i.test(m) ? 'Ada isian wajib yang kosong atau di luar batas yang diizinkan.'
   : m
 
 export async function ok(p: PromiseLike<{ error: { message: string } | null }>) {
   const { error } = await p
-  if (error) toast(ramah(error.message))
+  if (error) toast(error.message)
   return !error
 }
 
@@ -62,7 +66,51 @@ type Toast = { id: number; msg: string; tone: 'ok' | 'err' }
 let pushToast: (t: Toast) => void = () => {}
 let toastId = 0
 const emit = (msg: string, tone: Toast['tone']) => pushToast({ id: ++toastId, msg, tone })
-export const toast = Object.assign((msg: string) => emit(msg, 'err'), { ok: (msg: string) => emit(msg, 'ok') })
+export const toast = Object.assign((msg: string) => emit(ramah(msg), 'err'), { ok: (msg: string) => emit(msg, 'ok') })
+
+// ── dialog konfirmasi bertema (menggantikan confirm bawaan browser) ──
+type Tanya = { msg: string; judul: string; ya: string; bahaya: boolean; selesai: (v: boolean) => void }
+let bukaTanya: (t: Tanya) => void = (t) => t.selesai(false)
+export const konfirmasi = (msg: string, o: { judul?: string; ya?: string; bahaya?: boolean } = {}) =>
+  new Promise<boolean>((selesai) => bukaTanya({ msg, judul: o.judul ?? 'Yakin?', ya: o.ya ?? 'Lanjut', bahaya: !!o.bahaya, selesai }))
+
+function DialogKonfirmasi() {
+  const [t, setT] = useState<Tanya | null>(null)
+  useEffect(() => {
+    bukaTanya = setT
+    return () => {
+      bukaTanya = (x) => x.selesai(false)
+    }
+  }, [])
+  const tutup = (v: boolean) => {
+    t?.selesai(v)
+    setT(null)
+  }
+  useEffect(() => {
+    if (!t) return
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && tutup(false)
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  })
+  if (!t) return null
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4" onClick={() => tutup(false)}>
+      <div role="alertdialog" aria-modal="true" aria-label={t.judul} className="rise w-full max-w-md rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${t.bahaya ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary'}`}><AlertCircle size={18} /></span>
+          <div>
+            <h3 className="text-base font-bold">{t.judul}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{t.msg}</p>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <button className="btn2" autoFocus={t.bahaya} onClick={() => tutup(false)}>Batal</button>
+          <button className={`btn ${t.bahaya ? '!bg-danger !shadow-none' : ''}`} autoFocus={!t.bahaya} onClick={() => tutup(true)}>{t.ya}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Toaster() {
   const [list, setList] = useState<Toast[]>([])
@@ -76,6 +124,8 @@ export function Toaster() {
     }
   }, [])
   return (
+    <>
+    <DialogKonfirmasi />
     <div className="fixed bottom-4 right-4 z-50 space-y-2 w-96 max-w-[calc(100vw-2rem)]">
       {list.map((t) => (
         <div key={t.id} className={`rise flex items-start gap-3 rounded-xl border bg-card p-3.5 shadow-xl text-sm ${t.tone === 'ok' ? 'border-primary/30' : 'border-danger/30'}`}>
@@ -85,6 +135,7 @@ export function Toaster() {
         </div>
       ))}
     </div>
+    </>
   )
 }
 
@@ -144,15 +195,15 @@ export function TemaToggle({ className = '' }: { className?: string }) {
   )
 }
 
-// Versi berlabel: dua pilihan yang jelas terlihat
+// Dua ikon (matahari / bulan), tanpa teks supaya hemat ruang; tooltip menjelaskan
 export function TemaSwitch() {
   const { gelap, pilih } = useTema()
   const item = (aktif: boolean) =>
-    `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${aktif ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`
+    `inline-flex size-7 items-center justify-center rounded-md transition-colors ${aktif ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`
   return (
     <div role="group" aria-label="Pilih tema" className="inline-flex p-0.5 rounded-lg bg-muted border border-border">
-      <button onClick={() => pilih(false)} aria-pressed={!gelap} className={item(!gelap)}><Sun size={14} />Terang</button>
-      <button onClick={() => pilih(true)} aria-pressed={gelap} className={item(gelap)}><Moon size={14} />Gelap</button>
+      <button onClick={() => pilih(false)} aria-pressed={!gelap} aria-label="Tema terang" title="Tema terang" className={item(!gelap)}><Sun size={15} /></button>
+      <button onClick={() => pilih(true)} aria-pressed={gelap} aria-label="Tema gelap" title="Tema gelap" className={item(gelap)}><Moon size={15} /></button>
     </div>
   )
 }
@@ -412,7 +463,7 @@ export function Select({ value, onChange, opsi, placeholder = 'Pilih…', classN
 }
 
 export const Err = ({ msg }: { msg: string }) =>
-  msg ? <p className="text-danger text-sm mb-3 bg-danger-soft border border-danger/30 rounded-md px-3 py-2">{msg}</p> : null
+  msg ? <p className="text-danger text-sm mb-3 bg-danger-soft border border-danger/30 rounded-md px-3 py-2">{ramah(msg)}</p> : null
 
 // Kolom isian berlabel + penjelasan fungsinya, supaya jelas untuk apa tiap kolom
 export const Field = ({ label, hint, children, className = '' }: { label: string; hint?: string; children: ReactNode; className?: string }) => (

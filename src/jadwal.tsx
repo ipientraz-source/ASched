@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CalendarOff, Copy, FileText, Image as ImageIcon, Lock, Sparkles, Sun, Sunrise } from 'lucide-react'
-import { sb, today, monday, addDays, hari, useRows, ok, toast, Err, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
+import { CalendarOff, ChevronDown, Copy, Download, FileText, Image as ImageIcon, Lock, Sparkles, Sun, Sunrise } from 'lucide-react'
+import { sb, today, monday, addDays, hari, useRows, ok, toast, konfirmasi, Err, Select, type Ds, type Me, type Rider } from './lib'
 import { bagiCadangan, buatDraf, cadanganDisarankan, hitungRiwayat, polaAbsen, ringkasanKeadilan, type KuotaHari, type PolaHari, type StatRider } from './otomatis'
 import { Cetak } from './unduh'
 
@@ -10,7 +10,6 @@ const NAMA_HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
 const NAMA_BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const urutanHari = (d: string) => (new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7 // 0 = Senin
 const namaHari = (d: string) => NAMA_HARI[urutanHari(d)]
-const inisial = (n: string) => n.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
 const kerjaShift = (v: string | undefined) => v === 'pagi' || v === 'siang'
 
 // ── periode fleksibel: per minggu, per 2 minggu, per bulan, atau rentang tanggal sendiri ──
@@ -76,21 +75,21 @@ async function ambilAbsensi(dsId: string, dari: string, sampai: string) {
 // Satu sel jadwal berbentuk pil: Pagi (kuning), Siang (ungu), libur terkunci (abu + gembok), kosong = libur biasa (garis putus-putus).
 function Pil({ v, klik, title, ringkas }: { v: string; klik?: () => void; title?: string; ringkas?: boolean }) {
   const gaya =
-    v === 'pagi' ? 'border-warning/30 bg-warning-soft text-warning'
-    : v === 'siang' ? 'border-primary/30 bg-primary-soft text-primary-soft-foreground'
-    : v === 'off' ? 'border-border bg-muted text-muted-foreground'
-    : 'border-dashed border-border text-muted-foreground/50'
+    v === 'pagi' ? 'border-transparent bg-[var(--amber-400)] text-[#451a03] shadow-[0_2px_0_#d97706]'
+    : v === 'siang' ? 'border-transparent bg-primary text-primary-foreground shadow-[0_2px_0_var(--edge-primary)]'
+    : v === 'off' ? 'border-input bg-muted text-foreground/70 shadow-[0_2px_0_var(--edge)]'
+    : 'border-dashed border-input text-muted-foreground/70'
   const isi = ringkas
-    ? v === 'pagi' ? 'P' : v === 'siang' ? 'S' : v === 'off' ? <Lock size={11} /> : '·'
+    ? v === 'pagi' ? 'P' : v === 'siang' ? 'S' : v === 'off' ? <Lock size={12} /> : '–'
     : v === 'pagi' ? <><Sunrise size={13} />Pagi</>
     : v === 'siang' ? <><Sun size={13} />Siang</>
-    : v === 'off' ? <><Lock size={12} />Libur</>
-    : <span title="Libur">·</span>
-  const kelas = `inline-flex items-center justify-center rounded-lg border font-semibold transition-all ${ringkas ? 'size-7 text-[11px]' : 'w-[4.75rem] gap-1 px-2 py-1.5 text-xs'} ${gaya}`
+    : v === 'off' ? <><Lock size={12} />Off</>
+    : <span title="Libur biasa (tidak terkunci)">Off</span>
+  const kelas = `inline-flex items-center justify-center rounded-lg border font-bold transition-all ${ringkas ? 'size-7 text-[11px]' : 'w-[4.75rem] gap-1 px-2 py-1.5 text-xs'} ${gaya}`
   return klik ? (
     <button type="button" title={title} onClick={klik} className={`${kelas} hover:scale-105 hover:border-primary ${v ? '' : 'hover:text-primary'}`}>{isi}</button>
   ) : (
-    <span className={kelas} title={v === 'off' ? 'Libur terkunci (cuti/izin yang disepakati)' : undefined}>{isi}</span>
+    <span className={kelas} title={v === 'off' ? 'Off terkunci (cuti/izin yang disepakati): tidak diubah saat susun otomatis' : undefined}>{isi}</span>
   )
 }
 
@@ -123,12 +122,98 @@ function SelKuota({ nP, nS, k, editable, ringkas, ubah }: { nP: number; nS: numb
   )
 }
 
+// Dropdown "Unduh": gambar atau PDF (dibuat di browser, tidak disimpan di database)
+function MenuUnduh({ sibuk, kosong, pilih }: { sibuk: string | null; kosong: boolean; pilih: (m: 'png' | 'pdf') => void }) {
+  const [buka, setBuka] = useState(false)
+  const item = (m: 'png' | 'pdf', ikon: React.ReactNode, label: string) => (
+    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setBuka(false); pilih(m) }}>{ikon}{label}</button>
+  )
+  return (
+    <div className="relative">
+      <button className="btn2" disabled={!!sibuk || kosong} onClick={() => setBuka(!buka)} aria-haspopup="menu" aria-expanded={buka}>
+        <Download size={14} />{sibuk ? 'Membuat…' : 'Unduh'}<ChevronDown size={14} />
+      </button>
+      {buka && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setBuka(false)} />
+          <div role="menu" className="absolute left-0 top-full z-30 mt-1 w-44 rounded-xl border border-border bg-card p-1 shadow-lg">
+            {item('png', <ImageIcon size={14} />, 'Gambar (PNG)')}
+            {item('pdf', <FileText size={14} />, 'PDF')}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Satu langkah di panel atas: nomor, judul + penjelasan di kiri, kontrol di kanan
+function Langkah({ no, judul, ket, children }: { no: number; judul: string; ket: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
+      <div className="flex items-start gap-3 md:w-64 md:shrink-0">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{no}</span>
+        <div>
+          <div className="text-sm font-semibold leading-6">{judul}</div>
+          <div className="text-xs text-muted-foreground">{ket}</div>
+        </div>
+      </div>
+      <div className="flex flex-1 flex-wrap items-center gap-2">{children}</div>
+    </div>
+  )
+}
+
+// Riwayat jadwal tersimpan 1 DS per minggu (26 minggu ke belakang sampai 9 minggu ke depan). Klik "Buka" memuat minggu itu di grid.
+function RiwayatJadwal({ ds, aktif, versi, buka }: { ds: Ds; aktif: string; versi: number; buka: (senin: string) => void }) {
+  const [terbuka, setTerbuka] = useState(false) // data baru diambil saat panel dibuka
+  const r = useRows<Jd>(() => (terbuka ? ambilJadwal(ds.id, addDays(today(), -182), addDays(today(), 63)) : Promise.resolve({ data: [], error: null })), [ds.id, versi, terbuka])
+  const minggu = new Map<string, { rider: Set<string>; shift: number; off: number }>()
+  for (const x of r.rows) {
+    const m = monday(x.tanggal)
+    const e = minggu.get(m) ?? { rider: new Set<string>(), shift: 0, off: 0 }
+    if (x.shift === 'off') e.off++
+    else {
+      e.shift++
+      e.rider.add(x.rider_id)
+    }
+    minggu.set(m, e)
+  }
+  const daftar = [...minggu.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+  const tgl = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const sekarang = monday(today())
+  return (
+    <details className="card" onToggle={(e) => setTerbuka(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm font-semibold">Riwayat jadwal tersimpan {terbuka && <span className="font-normal text-muted-foreground">({daftar.length} minggu)</span>}</summary>
+      <Err msg={r.err} />
+      {daftar.length ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="tbl">
+            <thead><tr><th>Minggu</th><th>Rider terjadwal</th><th>Total shift</th><th>Off terkunci</th><th>Keterangan</th><th /></tr></thead>
+            <tbody>
+              {daftar.map(([sen, e]) => (
+                <tr key={sen} className={sen === monday(aktif) ? 'bg-primary-soft/60' : ''}>
+                  <td className="font-medium">{tgl(sen)} – {tgl(addDays(sen, 6))} {sen.slice(0, 4)}</td>
+                  <td className="font-mono">{e.rider.size}</td>
+                  <td className="font-mono">{e.shift}</td>
+                  <td className="font-mono text-muted-foreground">{e.off}</td>
+                  <td><span className={`badge ${sen === sekarang ? 'bg-primary-soft text-primary-soft-foreground' : sen > sekarang ? 'bg-warning-soft text-warning' : 'bg-muted text-muted-foreground'}`}>{sen === sekarang ? 'Minggu ini' : sen > sekarang ? 'Akan datang' : 'Sudah lewat'}</span></td>
+                  <td className="text-right"><button className="btn2" onClick={() => buka(sen)}>{sen === monday(aktif) ? 'Sedang dibuka' : 'Buka'}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">Belum ada jadwal tersimpan untuk DS ini.</p>
+      )}
+    </details>
+  )
+}
+
 // Ringkasan keadilan: hari kerja, pagi, siang, akhir pekan, libur tiap rider pada draf/jadwal yang sedang tampil
 function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string, StatRider> }) {
   const baris = riders.map((r) => ({ r, s: stat[r.id] })).sort((a, b) => b.s.hk - a.s.hk || a.r.nama.localeCompare(b.r.nama))
   const hk = baris.map((b) => b.s.hk)
   const we = baris.map((b) => b.s.akhirPekan)
-  const pg = usePage(baris, [riders.length + '|' + hk.join(',') + '|' + we.join(',')])
   const kisaran = (a: number[]) => (a.length ? `${Math.min(...a)}–${Math.max(...a)}` : '–')
   const selisih = (a: number[]) => (a.length ? Math.max(...a) - Math.min(...a) : 0)
   return (
@@ -144,7 +229,7 @@ function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string,
           <table className="tbl">
             <thead><tr><th>Rider</th><th>Hari kerja</th><th>Pagi</th><th>Siang</th><th>Akhir pekan</th><th>Libur</th></tr></thead>
             <tbody>
-              {pg.rows.map(({ r, s }) => (
+              {baris.map(({ r, s }) => (
                 <tr key={r.id}>
                   <td>{r.nama} <span className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</span></td>
                   <td className="font-mono font-semibold">{s.hk}</td><td className="font-mono">{s.pagi}</td><td className="font-mono">{s.siang}</td>
@@ -154,7 +239,6 @@ function PanelKeadilan({ riders, stat }: { riders: Rider[]; stat: Record<string,
             </tbody>
           </table>
         </div>
-        <Pagination {...pg} />
       </div>
     </details>
   )
@@ -191,8 +275,8 @@ function PanelPola({ pola, ds }: { pola: PolaHari[] | null; ds: Ds }) {
 }
 
 // Grid jadwal 1 DS untuk periode bebas. editable = Captain / Super-admin; read-only = Arcon (dan Super-admin di tampilan lihat).
-export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
-  const awal = editable ? addDays(monday(today()), 7) : monday(today())
+export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boolean; awalDari?: string }) {
+  const awal = awalDari ?? (editable ? addDays(monday(today()), 7) : monday(today())) // awalDari: dibuka dari Daftar Jadwal
   const [mode, setMode] = useState<Mode>('minggu')
   const [dari, setDari] = useState(awal)
   const [sampai, setSampai] = useState(addDays(awal, 6))
@@ -200,6 +284,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const [g, setG] = useState<Record<string, string>>({}) // "riderId|tanggal" -> pagi | siang | off
   const [kuota, setKuota] = useState<Record<string, Kq>>({}) // tanggal -> kebutuhan (hanya yang berbeda dari bawaan DS)
   const [cetak, setCetak] = useState<'png' | 'pdf' | null>(null)
+  const [versiRiwayat, setVersiRiwayat] = useState(0) // naik tiap kali jadwal disimpan, supaya Riwayat jadwal ikut diperbarui
   const [pertahankan, setPertahankan] = useState(false) // opsi Susun otomatis: pertahankan pagi/siang yang sudah diisi
   const [pakaiCadangan, setPakaiCadangan] = useState(false) // opsi Susun otomatis: tambah cadangan sesuai pola absen
   const [pola, setPola] = useState<PolaHari[] | null>(null)
@@ -229,7 +314,6 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const kq = (d: string): Kq => kuota[d] ?? { pagi: ds.kuota_pagi, siang: ds.kuota_siang, cadangan: 0 }
   const cnt = (d: string, s: string) => riders.rows.filter((r) => g[`${r.id}|${d}`] === s).length
   const shown = riders.rows.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
-  const pg = usePage(shown, [q, ds.id, dari, sampai])
   const adaIsi = days.some((d) => riders.rows.some((r) => kerjaShift(g[`${r.id}|${d}`])))
   const stat = ringkasanKeadilan(g, riders.rows.map((r) => r.id), days)
   // lebih dari 6 hari kerja dalam satu minggu Senin–Minggu → tandai merah
@@ -269,7 +353,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
   const susunOtomatis = async () => {
     if (!riders.rows.length) return toast('Belum ada rider aktif di DS ini.')
     if (days.every((d) => kq(d).pagi + kq(d).siang === 0)) return toast('Kebutuhan masih 0 untuk semua hari. Isi kebutuhan di baris kuota, atau minta Super-admin mengisi kuota DS di Kelola DS & Captain.')
-    if (adaIsi && !pertahankan && !confirm('Jadwal periode ini sudah ada isinya. Ganti dengan draf otomatis? (Libur terkunci tetap dihormati.)')) return
+    if (adaIsi && !pertahankan && !(await konfirmasi('Jadwal periode ini sudah ada isinya. Ganti dengan draf otomatis? Sel Off (gembok) tetap dihormati.', { judul: 'Ganti jadwal periode ini?', ya: 'Ganti' }))) return
     // Ingat 28 hari terakhir yang sudah tersimpan: keadilan hari kerja berlanjut lintas minggu, dan shift
     // tidak berganti tanpa libur dulu walau melewati batas periode.
     const { data, error } = await ambilJadwal(ds.id, addDays(dari, -28), addDays(dari, -1))
@@ -300,7 +384,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
     if (langgar.length) toast(`${langgar.length} kali rider terpaksa pindah shift tanpa libur dulu supaya kebutuhan terpenuhi (mulai ${hari(langgar[0].tanggal)}). Periksa lagi jadwalnya.`)
   }
 
-  // Salin periode sebelumnya yang panjangnya sama (mis. 14 hari terakhir sebelum periode ini), termasuk libur terkunci
+  // Salin periode sebelumnya yang panjangnya sama (mis. 14 hari terakhir sebelum periode ini), termasuk Off bergembok
   const salinSebelumnya = async () => {
     const n = days.length
     const { data, error } = await ambilJadwal(ds.id, addDays(dari, -n), addDays(dari, -1))
@@ -309,7 +393,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
     const baru: Record<string, string> = {}
     for (const r of data ?? []) if (aktif.has(r.rider_id)) baru[`${r.rider_id}|${addDays(r.tanggal, n)}`] = r.shift
     if (!Object.keys(baru).length) return toast('Periode sebelumnya belum ada jadwal untuk disalin.')
-    if (adaIsi && !confirm('Jadwal periode ini sudah ada isinya. Ganti dengan salinan periode sebelumnya?')) return
+    if (adaIsi && !(await konfirmasi('Jadwal periode ini sudah ada isinya. Ganti dengan salinan periode sebelumnya?', { judul: 'Ganti jadwal periode ini?', ya: 'Ganti' }))) return
     setG(baru)
     toast.ok('Jadwal periode sebelumnya disalin. Periksa dulu, lalu klik Simpan jadwal.')
   }
@@ -326,52 +410,61 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
       })
     if (await ok(sb.rpc('simpan_jadwal', { p_ds: ds.id, p_dari: days[0], p_sampai: days[days.length - 1], p_rows: rows }))) {
       toast.ok('Jadwal berhasil disimpan')
+      setVersiRiwayat((v) => v + 1)
       j.reload()
       kRows.reload()
     }
   }
 
+  const unduh = <MenuUnduh sibuk={cetak} kosong={!riders.rows.length} pilih={setCetak} />
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Select className="w-44" value={mode} onChange={gantiMode} opsi={[{ value: 'minggu', label: 'Per minggu' }, { value: 'dua', label: 'Per 2 minggu' }, { value: 'bulan', label: 'Per bulan' }, { value: 'bebas', label: 'Rentang sendiri' }]} />
-        <button className="btn2" onClick={() => pasang(...periodeDi(mode, today(), days.length))}>Hari ini</button>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Dari <input type="date" className="inp" value={dari} onChange={(e) => e.target.value && ubahDari(e.target.value)} />
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Sampai <input type="date" className="inp" value={sampai} min={dari} onChange={(e) => e.target.value && ubahTanggal(dari, e.target.value)} />
-        </label>
-        <span className="text-xs text-muted-foreground">{days.length} hari</span>
+      <div className="mb-4 divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
+        <Langkah no={1} judul="Pilih periode" ket="Rentang tanggal yang mau dijadwalkan.">
+          <Select className="w-44" value={mode} onChange={gantiMode} opsi={[{ value: 'minggu', label: 'Per minggu' }, { value: 'dua', label: 'Per 2 minggu' }, { value: 'bulan', label: 'Per bulan' }, { value: 'bebas', label: 'Rentang sendiri' }]} />
+          <button className="btn2" onClick={() => pasang(...periodeDi(mode, today(), days.length))}>Hari ini</button>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Dari <input type="date" className="inp" value={dari} onChange={(e) => e.target.value && ubahDari(e.target.value)} />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Sampai <input type="date" className="inp" value={sampai} min={dari} onChange={(e) => e.target.value && ubahTanggal(dari, e.target.value)} />
+          </label>
+          <span className="text-xs text-muted-foreground">{days.length} hari</span>
+        </Langkah>
+        {editable && (
+          <Langkah no={2} judul="Isi jadwal" ket="Susun otomatis, lalu rapikan manual dengan klik sel di tabel.">
+            <button className="btn2" onClick={susunOtomatis}><Sparkles size={14} />Susun otomatis</button>
+            <button className="btn2" onClick={salinSebelumnya}><Copy size={14} />Salin periode sebelumnya</button>
+            <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Opsi susun otomatis:</span>
+              <label className="flex cursor-pointer items-center gap-1.5" title="Pagi/siang yang sudah Anda isi tidak diubah; otomatis hanya mengisi sisanya. Sel Off bergembok selalu dihormati, dicentang atau tidak.">
+                <input type="checkbox" checked={pertahankan} onChange={(e) => setPertahankan(e.target.checked)} /> Pertahankan shift yang sudah diisi
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5" title="Menambah rider di atas kebutuhan client pada hari yang sering ada absen, berdasarkan pola 8 minggu terakhir.">
+                <input type="checkbox" checked={pakaiCadangan} onChange={(e) => setPakaiCadangan(e.target.checked)} /> Tambah cadangan sesuai pola absen
+              </label>
+            </div>
+          </Langkah>
+        )}
+        {editable && (
+          <Langkah no={3} judul="Simpan" ket="Jadwal baru berlaku setelah disimpan.">
+            <button className="btn" onClick={save}>Simpan jadwal</button>
+            {unduh}
+          </Langkah>
+        )}
+        {!editable && (
+          <Langkah no={2} judul="Unduh" ket="Dibuat di browser, tidak disimpan di database.">
+            {unduh}
+          </Langkah>
+        )}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input className="inp w-56" placeholder="Cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">
-          <Pil v="pagi" /> <Pil v="siang" /> <Pil v="off" /> <Pil v="" /> <span>libur</span>
-        </div>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <button className="btn2" disabled={!!cetak || !riders.rows.length} onClick={() => setCetak('png')} title="Unduh jadwal periode ini sebagai gambar"><ImageIcon size={14} />{cetak === 'png' ? 'Membuat…' : 'Unduh gambar'}</button>
-          <button className="btn2" disabled={!!cetak || !riders.rows.length} onClick={() => setCetak('pdf')} title="Unduh jadwal periode ini sebagai PDF"><FileText size={14} />{cetak === 'pdf' ? 'Membuat…' : 'Unduh PDF'}</button>
-          {editable && (
-            <>
-              <button className="btn2" onClick={salinSebelumnya}><Copy size={14} />Salin periode sebelumnya</button>
-              <button className="btn2" onClick={susunOtomatis}><Sparkles size={14} />Susun otomatis</button>
-              <button className="btn" onClick={save}>Simpan jadwal</button>
-            </>
-          )}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">Keterangan:</span> <Pil v="pagi" /> <Pil v="siang" /> <Pil v="" /> <span>libur</span> <Pil v="off" /> <span>libur terkunci (tidak diubah susun otomatis)</span>
         </div>
       </div>
-      {editable && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">Opsi Susun otomatis:</span>
-          <label className="flex cursor-pointer items-center gap-1.5" title="Pagi/siang yang sudah Anda isi tidak diubah; otomatis hanya mengisi sisanya. Libur terkunci (gembok) selalu dihormati, dicentang atau tidak.">
-            <input type="checkbox" checked={pertahankan} onChange={(e) => setPertahankan(e.target.checked)} /> Pertahankan shift yang sudah diisi
-          </label>
-          <label className="flex cursor-pointer items-center gap-1.5" title="Menambah rider di atas kebutuhan client pada hari yang sering ada absen, berdasarkan pola 8 minggu terakhir.">
-            <input type="checkbox" checked={pakaiCadangan} onChange={(e) => setPakaiCadangan(e.target.checked)} /> Tambah cadangan sesuai pola absen
-          </label>
-        </div>
-      )}
       <Err msg={riders.err || j.err || kRows.err} />
       {!editable && !j.rows.length && riders.rows.length > 0 && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
@@ -401,13 +494,13 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
             </tr>
           </thead>
           <tbody>
-            {pg.rows.map((r) => {
+            {shown.map((r, i) => {
               const kerja = days.filter((d) => kerjaShift(g[`${r.id}|${d}`])).length
               return (
                 <tr key={r.id} className="group">
                   <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border/60 bg-card px-4 py-2 transition-colors group-hover:bg-primary-soft">
                     <div className="flex items-center gap-3">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{inisial(r.nama)}</span>
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-bold text-muted-foreground">{i + 1}</span>
                       <div className="leading-tight">
                         <div className="font-medium">{r.nama}</div>
                         <div className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</div>
@@ -419,7 +512,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                     const v = g[k] ?? ''
                     return (
                       <td key={d} className={`border-b border-border/60 py-2 text-center transition-colors group-hover:bg-primary-soft/60 ${padat ? 'px-0.5' : 'px-2'} ${d === today() ? 'bg-primary-soft/40' : ''}`}>
-                        <Pil v={v} ringkas={padat} title="Klik untuk mengganti: libur → pagi → siang → libur terkunci (cuti/izin, tidak diisi otomatis)" klik={editable ? () => setG({ ...g, [k]: SIKLUS[(SIKLUS.indexOf(v) + 1) % SIKLUS.length] }) : undefined} />
+                        <Pil v={v} ringkas={padat} title="Klik untuk mengganti: kosong (libur) → pagi → siang → Off bergembok (cuti/izin, tidak diisi otomatis)" klik={editable ? () => setG({ ...g, [k]: SIKLUS[(SIKLUS.indexOf(v) + 1) % SIKLUS.length] }) : undefined} />
                       </td>
                     )
                   })}
@@ -430,7 +523,7 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
                 </tr>
               )
             })}
-            {!pg.rows.length && (
+            {!shown.length && (
               <tr><td colSpan={days.length + 2} className="px-4 py-10 text-center text-muted-foreground">{riders.rows.length ? 'Tidak ada rider yang cocok dengan pencarian.' : 'Belum ada rider aktif di DS ini.'}</td></tr>
             )}
           </tbody>
@@ -450,16 +543,18 @@ export function JadwalGrid({ ds, editable }: { ds: Ds; editable: boolean }) {
           </tfoot>
         </table>
         </div>
-        <Pagination {...pg} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         {editable && (
           <>
-            Warna baris kebutuhan: hijau pas, kuning kurang, biru lebih tapi masih dalam jatah cadangan, merah kelebihan. Jadwal tetap bisa disimpan. Klik sel untuk mengganti: libur, pagi, siang, lalu <b>libur terkunci</b> (gembok) untuk cuti atau izin yang sudah disepakati, yang tidak akan diisi otomatis. "Susun otomatis" membagi shift sesuai kebutuhan tiap hari secara adil dan membaca jadwal 28 hari sebelumnya yang sudah tersimpan (simpan periode sebelumnya dulu). Aturannya: maksimal 6 hari kerja per minggu dan 6 hari berturut-turut, shift hanya berganti setelah libur, dan setelah libur rider melanjutkan shift sebelumnya. Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal. Pindah periode sebelum menyimpan akan membuang draf.{' '}
+            Warna baris kebutuhan: hijau pas, kuning kurang, biru lebih tapi masih dalam jatah cadangan, merah kelebihan. Jadwal tetap bisa disimpan. Klik sel untuk mengganti: libur, pagi, siang, lalu <b>Off</b> (gembok) untuk cuti atau izin yang sudah disepakati, yang tidak akan diisi otomatis. "Susun otomatis" membagi shift sesuai kebutuhan tiap hari secara adil dan membaca jadwal 28 hari sebelumnya yang sudah tersimpan (simpan periode sebelumnya dulu). Aturannya: maksimal 6 hari kerja per minggu dan 6 hari berturut-turut, shift hanya berganti setelah libur, dan setelah libur rider melanjutkan shift sebelumnya. Hasilnya hanya draf: periksa dan ubah dulu, baru klik Simpan jadwal. Pindah periode sebelum menyimpan akan membuang draf.{' '}
           </>
         )}
         Gambar dan PDF dibuat langsung di browser dan tidak disimpan di database.
       </p>
+      <div className="mt-4">
+        <RiwayatJadwal ds={ds} aktif={dari} versi={versiRiwayat} buka={(sen) => { setMode('minggu'); pasang(sen, addDays(sen, 6)); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
+      </div>
       {riders.rows.length > 0 && (
         <div className="mt-4">
           <PanelKeadilan riders={riders.rows} stat={stat} />

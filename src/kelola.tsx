@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { sb, useRows, ok, toast, Err, Field, RiderPick, usePage, Pagination, type Ds, type Rider } from './lib'
+import { sb, useRows, ok, toast, konfirmasi, Err, Field, RiderPick, Select, usePage, Pagination, type Ds, type Rider } from './lib'
 
 // Buat / ganti password akun login lewat edge function (service role ada di server, bukan di browser)
 async function buatAkun(email: string, password: string) {
@@ -24,7 +24,7 @@ export function Kelola() {
   const [nama, setNama] = useState('')
   const [cari, setCari] = useState('')
   const candidates = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'captain') && r.status === 'aktif')
-  const kandidatArcon = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'arcon') && r.status === 'aktif') // Captain tidak bisa merangkap Arcon
+  const arcons = rs.rows.filter((r) => r.peran === 'arcon' && r.status === 'aktif') // Arcon = tim khusus, bukan rider
   const tampil = dsl.rows.filter((d) => (d.nama + (rs.rows.find((r) => r.id === d.captain_id)?.nama ?? '')).toLowerCase().includes(cari.toLowerCase()))
   const pg = usePage(tampil, [cari])
 
@@ -51,7 +51,7 @@ export function Kelola() {
       <div className="card">
         <b className="block mb-3">Buat DS baru</b>
         <div className="flex flex-wrap items-start gap-3">
-          <Field label="Nama DS" hint="Tulis persis seperti yang akan dipakai di file CSV rider, misalnya DS HAYAM WURUK." className="min-w-72 flex-1 max-w-md">
+          <Field label="Nama DS" hint="Tulis persis seperti yang akan dipakai di file CSV rider, misalnya DS HAYAM WURUK." className="min-w-[min(18rem,100%)] flex-1 max-w-md">
             <input className="inp w-full" placeholder="Contoh: DS HAYAM WURUK" value={nama} onChange={(e) => setNama(e.target.value)} />
           </Field>
           <div className="pt-5">
@@ -72,12 +72,14 @@ export function Kelola() {
         </div>
       </div>
 
+      <ArconTim arcons={rs.rows.filter((r) => r.peran === 'arcon')} semuaDs={dsl.rows} reload={rs.reload} />
+
       <div className="flex items-center gap-3 mb-3">
         <input className="inp w-72 max-w-full" placeholder="Cari DS atau nama Captain…" value={cari} onChange={(e) => setCari(e.target.value)} />
         <span className="text-sm text-muted-foreground">{tampil.length} DS</span>
       </div>
       {pg.rows.map((d) => (
-        <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} kandidatArcon={kandidatArcon} semuaDs={dsl.rows} reload={() => { dsl.reload(); rs.reload() }} />
+        <DsCard key={d.id} d={d} riders={rs.rows} candidates={candidates} arcons={arcons} semuaDs={dsl.rows} reload={() => { dsl.reload(); rs.reload() }} />
       ))}
       {!tampil.length && <div className="card text-center text-muted-foreground text-sm">{dsl.rows.length ? 'Tidak ada DS yang cocok dengan pencarian.' : 'Belum ada DS. Buat yang pertama di atas.'}</div>}
 
@@ -88,24 +90,19 @@ export function Kelola() {
   )
 }
 
-function DsCard({ d, riders, candidates, kandidatArcon, semuaDs, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; kandidatArcon: Rider[]; semuaDs: Ds[]; reload: () => void }) {
+function DsCard({ d, riders, candidates, arcons, semuaDs, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; arcons: Rider[]; semuaDs: Ds[]; reload: () => void }) {
   const [arPick, setArPick] = useState('')
-  const [arEmail, setArEmail] = useState('')
-  const [arPw, setArPw] = useState('')
   const arc = riders.find((r) => r.id === d.arcon_id)
   const jmlDsArcon = arc ? semuaDs.filter((x) => x.arcon_id === arc.id).length : 0
-  const kurangArcon = !arPick ? 'Pilih rider dulu' : !arEmail.trim() ? 'Isi email untuk login' : arPw && arPw.length < 8 ? 'Password minimal 8 karakter' : ''
+  const kurangArcon = !arcons.length ? 'Belum ada Arcon. Tambahkan dulu di bagian Arcon di atas' : !arPick ? 'Pilih Arcon dulu' : ''
   const tunjukArcon = async () => {
-    if (!(await ok(sb.rpc('set_arcon', { p_ds: d.id, p_rider: arPick, p_email: arEmail })))) return
-    if (arPw) await buatAkun(arEmail, arPw)
+    if (!(await ok(sb.rpc('pilih_arcon', { p_ds: d.id, p_arcon: arPick })))) return
     setArPick('')
-    setArEmail('')
-    setArPw('')
     toast.ok('Arcon berhasil dipilih')
     reload()
   }
   const lepasArcon = async () => {
-    if (confirm(`Lepas ${arc?.nama} dari ${d.nama}? Beliau tetap memegang DS lain kalau ada.`) && (await ok(sb.rpc('lepas_arcon', { p_ds: d.id })))) {
+    if ((await konfirmasi(`Lepas ${arc?.nama} dari ${d.nama}? Beliau tetap memegang DS lain kalau ada.`, { judul: 'Lepas Arcon dari DS ini?', ya: 'Lepas', bahaya: true })) && (await ok(sb.rpc('lepas_arcon', { p_ds: d.id })))) {
       toast.ok('Arcon dilepas dari DS ini')
       reload()
     }
@@ -190,20 +187,14 @@ function DsCard({ d, riders, candidates, kandidatArcon, semuaDs, reload }: { d: 
       </div>
 
       <div className="mt-5 pt-4 border-t border-border">
-        <b className="block">{arc ? 'Ganti Arcon' : 'Tunjuk Arcon (opsional)'}</b>
+        <b className="block">{arc ? 'Ganti Arcon' : 'Pilih Arcon (opsional)'}</b>
         <p className="text-sm text-muted-foreground mb-3">
-          Arcon adalah atasan Captain yang memantau beberapa DS sekaligus. Satu Arcon bisa dipilih di banyak DS. Arcon hanya memantau (dashboard, rider, jadwal, laporan) dan bisa mengunci absensi mingguan.{' '}
+          Arcon adalah atasan Captain dari tim yang ditunjuk khusus, bukan rider. Satu Arcon bisa dipilih di banyak DS. Arcon hanya memantau (dashboard, rider, jadwal, laporan) dan bisa mengunci absensi mingguan.{' '}
           {arc && <>Arcon sekarang: <b className="text-foreground">{arc.nama}</b> ({arc.email}), memegang {jmlDsArcon} DS.</>}
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
-          <Field label="Rider yang jadi Arcon" hint="Pilih rider yang bukan Captain. Rider yang sudah jadi Arcon di DS lain juga bisa dipilih lagi.">
-            <RiderPick riders={kandidatArcon} value={arPick} onChange={setArPick} placeholder="— pilih rider —" />
-          </Field>
-          <Field label="Email untuk login" hint="Arcon memakai email ini untuk masuk ke aplikasi.">
-            <input className="inp w-full" type="email" placeholder="nama@email.com" value={arEmail} onChange={(e) => setArEmail(e.target.value)} />
-          </Field>
-          <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
-            <input className="inp w-full" type="password" autoComplete="new-password" value={arPw} onChange={(e) => setArPw(e.target.value)} />
+          <Field label="Arcon untuk DS ini" hint="Pilih dari daftar Arcon. Arcon baru ditambahkan di bagian Arcon di atas daftar DS.">
+            <Select value={arPick} onChange={setArPick} placeholder="— pilih Arcon —" opsi={arcons.map((a) => ({ value: a.id, label: `${a.nama} (${a.email ?? 'tanpa email'})` }))} />
           </Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -211,6 +202,59 @@ function DsCard({ d, riders, candidates, kandidatArcon, semuaDs, reload }: { d: 
           {arc && <button className="btn2 !text-danger" onClick={lepasArcon}>Lepas Arcon dari DS ini</button>}
           {kurangArcon && <span className="text-xs text-muted-foreground">{kurangArcon}</span>}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Arcon = tim yang ditunjuk khusus (bukan rider). Dibuat di sini, lalu dipilih per DS di kartu DS.
+function ArconTim({ arcons, semuaDs, reload }: { arcons: Rider[]; semuaDs: Ds[]; reload: () => void }) {
+  const [f, setF] = useState({ nama: '', email: '', pw: '' })
+  const kurang = !f.nama.trim() ? 'Isi nama dulu' : !f.email.trim() ? 'Isi email untuk login' : f.pw && f.pw.length < 8 ? 'Password minimal 8 karakter' : ''
+  return (
+    <div className="card">
+      <b className="block">Arcon</b>
+      <p className="text-sm text-muted-foreground mb-3">
+        Arcon adalah atasan Captain dari tim yang ditunjuk khusus, bukan rider. Tambahkan orangnya di sini, lalu pilih Arcon di kartu tiap DS. Satu Arcon bisa memegang banyak DS.
+      </p>
+      {arcons.length > 0 ? (
+        <ul className="flex flex-wrap gap-2 mb-5">
+          {arcons.map((a) => (
+            <li key={a.id} className="badge bg-primary-soft text-primary-soft-foreground !text-sm !px-3 !py-1">
+              {a.nama} · {a.email} · {semuaDs.filter((d) => d.arcon_id === a.id).length} DS{a.status === 'nonaktif' ? ' · nonaktif' : ''}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground mb-5">Belum ada Arcon.</p>
+      )}
+      <b className="block text-sm mb-3">Tambah Arcon baru</b>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+        <Field label="Nama" hint="Nama lengkap orangnya.">
+          <input className="inp w-full" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
+        </Field>
+        <Field label="Email untuk login" hint="Arcon memakai email ini untuk masuk ke aplikasi.">
+          <input className="inp w-full" type="email" placeholder="nama@email.com" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+        </Field>
+        <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
+          <input className="inp w-full" type="password" autoComplete="new-password" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} />
+        </Field>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          className="btn2"
+          disabled={!!kurang}
+          onClick={async () => {
+            if (!(await ok(sb.from('riders').insert({ nama: f.nama.trim(), email: f.email, peran: 'arcon' })))) return
+            if (f.pw) await buatAkun(f.email, f.pw)
+            setF({ nama: '', email: '', pw: '' })
+            toast.ok('Arcon ditambahkan. Sekarang pilih Arcon ini di kartu DS.')
+            reload()
+          }}
+        >
+          Tambah Arcon
+        </button>
+        {kurang && <span className="text-xs text-muted-foreground">{kurang}</span>}
       </div>
     </div>
   )
