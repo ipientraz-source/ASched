@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, X } from 'lucide-react'
 import { sb, today, useRows, ok, toast, Field, Select, Kosong, usePage, Pagination, type Ds } from './lib'
-import { BadgeItem, JENIS_SERVIS, Tenggat, tgl, type ItemServis, type Motor, type Permintaan, type RingkasanPermintaan } from './armada-lib'
+import { angka, BadgeItem, InputRupiah, JENIS_SERVIS, Tenggat, tgl, type ItemServis, type Motor, type Permintaan, type RingkasanPermintaan } from './armada-lib'
 
 type Props = {
   permintaan: Permintaan[]; ringkasan: RingkasanPermintaan[]; terbuka: ItemServis[]; motors: Motor[]; dsNama: (id: string | null) => string
@@ -68,8 +68,11 @@ function FormPengajuan({ dsBoleh, selesai }: { dsBoleh: Ds[]; selesai: () => voi
 // ───────── molis yang menunggu servis ─────────
 function Menunggu({ permintaan, terbuka, motors, dsNama, kelola, bukaServis, reload }: Props) {
   const [q, setQ] = useState('')
-  const [aksi, setAksi] = useState<{ id: string; jenis: 'jadwal' | 'lewati' } | null>(null)
+  const [aksi, setAksi] = useState<{ id: string; jenis: 'jadwal' | 'lewati' | 'selesai' } | null>(null)
   const [nilai, setNilai] = useState('')
+  const [bengkel, setBengkel] = useState('')
+  const [biaya, setBiaya] = useState('')
+  const [asuransi, setAsuransi] = useState(false)
   const baris = terbuka
     .map((it) => ({ it, m: motors.find((x) => x.id === it.motor_id), r: permintaan.find((x) => x.id === it.permintaan_id) }))
     .filter((b) => b.m && b.r && `${b.m.kode_motor} ${b.m.plat_nomor ?? ''} ${b.r.judul}`.toLowerCase().includes(q.toLowerCase()))
@@ -87,7 +90,22 @@ function Menunggu({ permintaan, terbuka, motors, dsNama, kelola, bukaServis, rel
     setNilai('')
     reload()
   }
-  const buka = (id: string, jenis: 'jadwal' | 'lewati') => { setAksi(aksi?.id === id && aksi.jenis === jenis ? null : { id, jenis }); setNilai('') }
+  const buka = (id: string, jenis: 'jadwal' | 'lewati' | 'selesai') => {
+    setAksi(aksi?.id === id && aksi.jenis === jenis ? null : { id, jenis })
+    setNilai(jenis === 'selesai' ? today() : '')
+    setBengkel('')
+    setBiaya('')
+    setAsuransi(false)
+  }
+  // Tandai selesai = mencatat servis (jenis sama dengan pengajuan); trigger database yang menyelesaikan item dan memajukan jadwal servis
+  async function tandaiSelesai(motorId: string, jenis: string) {
+    if (!nilai) return toast('Pilih tanggal servis.')
+    const sukses = await ok(sb.from('servis_motor').insert({ motor_id: motorId, tanggal: nilai, jenis, bengkel: bengkel.trim() || null, biaya: asuransi ? 0 : angka(biaya), ditanggung_asuransi: asuransi }))
+    if (!sukses) return
+    toast.ok('Servis dicatat dan motor ditandai selesai')
+    setAksi(null)
+    reload()
+  }
 
   return (
     <div>
@@ -110,11 +128,29 @@ function Menunggu({ permintaan, terbuka, motors, dsNama, kelola, bukaServis, rel
                   {kelola && (
                     <td>
                       <div className="flex flex-wrap gap-1.5">
-                        <button className="btn2" onClick={() => bukaServis(m!.id)}>Catat servis</button>
+                        {r!.jenis === 'Lainnya'
+                          ? <button className="btn2" onClick={() => bukaServis(m!.id)}>Catat servis</button>
+                          : <button className={aksi?.id === it.id && aksi.jenis === 'selesai' ? 'btn' : 'btn2'} onClick={() => buka(it.id, 'selesai')}>Tandai selesai</button>}
                         <button className="btn2" onClick={() => buka(it.id, 'jadwal')}>Jadwalkan</button>
                         <button className="btn2" onClick={() => buka(it.id, 'lewati')}>Lewati</button>
                       </div>
-                      {aksi?.id === it.id && (
+                      {aksi?.id === it.id && aksi.jenis === 'selesai' && (
+                        <div className="mt-2 space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="flex items-center gap-1.5 text-sm text-muted-foreground">Tanggal servis <input type="date" className="inp" max={today()} value={nilai} onChange={(e) => setNilai(e.target.value)} /></label>
+                            <input className="inp w-48 max-w-full" placeholder="Bengkel (opsional)" value={bengkel} onChange={(e) => setBengkel(e.target.value)} />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                            <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={asuransi} onChange={(e) => { setAsuransi(e.target.checked); if (e.target.checked) setBiaya('') }} />Ditanggung asuransi (biaya Rp 0)</label>
+                            <span className="flex items-center gap-2 text-muted-foreground">Biaya <InputRupiah nilai={asuransi ? '' : biaya} ubah={setBiaya} disabled={asuransi} /></span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button className="btn" onClick={() => tandaiSelesai(m!.id, r!.jenis)}>Simpan dan tandai selesai</button>
+                            <button className="btn2" onClick={() => bukaServis(m!.id)} title="Buka form servis lengkap: kilometer, catatan, dan foto">Isi lengkap (foto, kilometer)</button>
+                          </div>
+                        </div>
+                      )}
+                      {aksi?.id === it.id && aksi.jenis !== 'selesai' && (
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           {aksi.jenis === 'jadwal'
                             ? <input type="date" className="inp" min={today()} value={nilai} onChange={(e) => setNilai(e.target.value)} />
