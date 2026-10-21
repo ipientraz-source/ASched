@@ -118,7 +118,7 @@ function DailyInner({ ds }: { ds: Ds }) {
       </div>
       {locked && <p className="bg-warning-soft border border-warning/40 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
       <Err msg={riders.err || jd.err || ac.err} />
-      <div className="space-y-2">
+      <div className="space-y-3 md:space-y-2">
         {pg.rows.map((r) => (
           <Baris
             key={r.id + tgl}
@@ -157,13 +157,15 @@ function Baris({
   catat: Catat
   hapus: (id: string) => void
 }) {
+  // Form "Tidak hadir" memuat isian yang sudah tersimpan, jadi mengoreksi tidak mengulang dari awal.
+  const lama = act && ['alpha', 'izin', 'sakit', 'tukar'].includes(act.status) ? act : undefined
   const [buka, setBuka] = useState(false)
-  const [alasan, setAlasan] = useState('alpha')
-  const [backup, setBackup] = useState('')
-  const [teks, setTeks] = useState('')
-  const [potongan, setPotongan] = useState('ya') // saran awal: Alpha = Ya, Izin/Sakit = Tidak; Captain bisa mengubah
-  const [ins, setIns] = useState(false)
-  const [nominal, setNominal] = useState('')
+  const [alasan, setAlasan] = useState(lama?.status ?? 'alpha')
+  const [backup, setBackup] = useState(lama?.backup_untuk_id ?? '')
+  const [teks, setTeks] = useState(lama?.penjelasan ?? '')
+  const [potongan, setPotongan] = useState(lama ? (lama.potongan === true || (lama.potongan == null && lama.status === 'alpha') ? 'ya' : 'tidak') : 'ya') // saran awal: Alpha = Ya, Izin/Sakit = Tidak; Captain bisa mengubah
+  const [ins, setIns] = useState(!!lama?.insentif)
+  const [nominal, setNominal] = useState(lama?.insentif ? String(lama.insentif) : '')
 
   const gantiAlasan = (v: string) => {
     setAlasan(v)
@@ -198,15 +200,15 @@ function Baris({
         {act?.potongan === false && <span className="badge bg-muted text-muted-foreground">Tanpa potongan</span>}
         {!!act?.insentif && <span className="badge bg-success-soft text-success">+ Insentif {rupiah(act.insentif)}</span>}
         {act?.penjelasan && <span className="text-xs text-muted-foreground">“{act.penjelasan}”</span>}
-        <div className="ml-auto flex flex-wrap gap-2">
-          <button className="btn btn-lg whitespace-nowrap" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
+        <div className="flex w-full flex-wrap gap-2 md:ml-auto md:w-auto">
+          <button className="btn btn-lg flex-1 whitespace-nowrap md:flex-none" disabled={locked} onClick={() => { setBuka(false); catat(r.id, 'hadir') }}>
             Hadir
           </button>
-          <button className="btn2 btn-lg whitespace-nowrap" disabled={locked} onClick={() => setBuka(!buka)}>
+          <button className="btn2 btn-lg flex-1 whitespace-nowrap md:flex-none" disabled={locked} aria-expanded={buka} onClick={() => setBuka(!buka)}>
             Tidak hadir
           </button>
           {act && (
-            <button className="btn2" disabled={locked} onClick={() => hapus(r.id)} title="Hapus isian, kembali ke belum diabsen">
+            <button className="btn2 w-full md:w-auto" disabled={locked} onClick={() => hapus(r.id)} title="Hapus isian, kembali ke belum diabsen">
               Batalkan
             </button>
           )}

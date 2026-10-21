@@ -163,7 +163,7 @@ export function Dashboard() {
                 <div className="flex h-4 rounded-full overflow-hidden mb-4">
                   {seg.filter((s) => s.n).map((s) => <div key={s.k} className={warna[s.k]} style={{ width: `${(100 * s.n) / total}%` }} title={`${s.k}: ${s.n}`} />)}
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                   {seg.map((s) => (
                     <div key={s.k} className="flex items-center gap-2">
                       <span className={`size-2.5 rounded-full ${warna[s.k]}`} />

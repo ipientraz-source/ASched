@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { BellRing, Bike, Building2, Eye, EyeOff, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, ListChecks, LogOut, ShieldCheck, TrendingUp, UserCog, Users, type LucideIcon } from 'lucide-react'
 import { sb, store, useRows, toast, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
@@ -84,10 +84,12 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
     setBusy(true)
     if (tab === 'admin') {
       const { error } = await sb.auth.signInWithPassword({ email: a.trim(), password: b })
-      if (error) setErr('Email atau password salah')
+      // hanya kredensial yang salah yang disebut "salah"; gangguan sinyal HP tampil apa adanya (diterjemahkan oleh Err)
+      if (error) setErr(/invalid login credentials/i.test(error.message) ? 'Email atau password salah' : error.message)
     } else {
-      const { data } = await sb.rpc('jadwal_rider', { p_kode: a })
-      if (data?.length) onKode(a.trim().toUpperCase())
+      const { data, error } = await sb.rpc('jadwal_rider', { p_kode: a })
+      if (error) setErr(error.message)
+      else if (data?.length) onKode(a.trim().toUpperCase())
       else setErr('Kode MTR tidak ditemukan atau rider nonaktif')
     }
     setBusy(false)
@@ -136,13 +138,25 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
           <p className="text-sm text-muted-foreground mb-6">Pilih cara masuk sesuai peran Anda.</p>
           <div className="grid grid-cols-2 gap-1 p-1 mb-5 rounded-lg bg-muted">
             {(['admin', 'rider'] as const).map((t) => (
-              <button type="button" key={t} onClick={() => { setTab(t); setErr('') }} className={`tab text-center ${tab === t ? 'tab-on' : ''}`}>
+              <button type="button" key={t} onClick={() => { setTab(t); setErr('') }} className={`tab text-center !px-2 ${tab === t ? 'tab-on' : ''}`}>
                 {t === 'admin' ? 'Captain / Admin' : 'Rider'}
               </button>
             ))}
           </div>
           <label className="lbl">{tab === 'admin' ? 'Email' : 'Kode MTR'}</label>
-          <input className="inp w-full mb-4 !py-2.5" value={a} onChange={(e) => setA(e.target.value)} autoFocus placeholder={tab === 'admin' ? 'nama@dashelectric.co' : 'MTR001'} />
+          <input
+            className="inp w-full mb-4 !py-2.5"
+            type={tab === 'admin' ? 'email' : 'text'}
+            inputMode={tab === 'admin' ? 'email' : 'text'}
+            autoComplete={tab === 'admin' ? 'username' : 'off'}
+            autoCapitalize={tab === 'admin' ? 'none' : 'characters'}
+            autoCorrect="off"
+            spellCheck={false}
+            value={a}
+            onChange={(e) => setA(e.target.value)}
+            autoFocus
+            placeholder={tab === 'admin' ? 'nama@dashelectric.co' : 'MTR001'}
+          />
           {tab === 'admin' && (
             <>
               <label className="lbl">Password</label>
@@ -277,11 +291,15 @@ function AdminApp({ email }: { email: string }) {
   const [ds, setDs] = useState<Ds | null>(null)
   const [dsList, setDsList] = useState<Ds[]>([])
   const [tab, setTab] = useState(0)
+  const [galat, setGalat] = useState('')
+  const tabBar = useRef<HTMLElement>(null)
 
   useEffect(() => {
     ;(async () => {
-      const { data } = await sb.from('riders').select('id,nama,peran,ds_id,email').eq('email', email.toLowerCase()).maybeSingle()
-      setMe(data as Me | null)
+      const { data, error } = await sb.from('riders').select('id,nama,peran,ds_id,email').eq('email', email.toLowerCase()).maybeSingle()
+      // gagal memuat (mis. sinyal HP putus) bukan berarti akun tidak terdaftar
+      if (error) return setGalat(error.message)
+      // DS dimuat lebih dulu daripada me, supaya Captain tidak sempat melihat "belum ditunjuk" sebelum DS-nya terbaca
       if (data?.peran === 'arcon') {
         const r = await sb.from('ds').select('*').eq('arcon_id', data.id).order('nama')
         setDsList((r.data ?? []) as Ds[])
@@ -290,9 +308,26 @@ function AdminApp({ email }: { email: string }) {
         const r = await sb.from('ds').select('*').eq('captain_id', data.id).maybeSingle()
         setDs(r.data as Ds | null)
       }
+      setMe(data as Me | null)
     })()
   }, [email])
 
+  // Ganti menu: halaman kembali ke atas dan tab yang aktif digeser ke tengah bar tab (di HP bar-nya bisa digulir)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    tabBar.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [tab])
+
+  if (galat)
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-sm card text-center !p-6">
+          <ShieldCheck className="mx-auto mb-3 text-muted-foreground/70" size={32} />
+          <p className="mb-4 text-sm">Data akun belum bisa dimuat. Periksa internet Anda lalu coba lagi.</p>
+          <button className="btn" onClick={() => location.reload()}>Muat ulang</button>
+        </div>
+      </div>
+    )
   if (me === undefined) return <p className="p-6 text-muted-foreground">Memuat…</p>
   if (me === null)
     return (
@@ -351,9 +386,9 @@ function AdminApp({ email }: { email: string }) {
           <TemaToggle className="hover:!bg-white/10" />
           <button onClick={() => sb.auth.signOut()} className="p-2"><LogOut size={18} /></button>
         </div>
-        <nav className="md:hidden flex gap-1 p-2 bg-card border-b border-border overflow-x-auto">
+        <nav ref={tabBar} className="md:hidden flex gap-1 p-2 bg-card border-b border-border overflow-x-auto no-scrollbar">
           {tabs.map((t, i) => (
-            <button key={t.nama} onClick={() => setTab(i)} className={`tab ${i === tab ? 'tab-on' : ''}`}>{t.nama}</button>
+            <button key={t.nama} onClick={() => setTab(i)} aria-current={i === tab ? 'page' : undefined} className={`tab ${i === tab ? 'tab-on' : ''}`}>{t.nama}</button>
           ))}
         </nav>
 

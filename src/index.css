@@ -154,6 +154,17 @@ h1, h2, h3 { font-family: var(--font-display); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise 0.28s ease-out both; }
+/* Layar sentuh: iOS Safari memperbesar halaman saat mengisi kolom berfont di bawah 16px dan tidak mengecilkannya lagi.
+   Tombol dan kolom juga dibuat cukup tinggi untuk jari. */
+@media (pointer: coarse) {
+  .inp { font-size: 16px; min-height: 2.5rem; }
+  .btn, .btn2 { min-height: 2.5rem; }
+  .tab { min-height: 2.5rem; }
+  .stat:hover { transform: none; }
+}
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 @media (prefers-reduced-motion: reduce) { .rise { animation: none; } * { transition-duration: 0.01ms !important; } }
 
 /* Komponen — state: default / hover / active / focus-visible / disabled */
