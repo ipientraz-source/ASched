@@ -1,6 +1,6 @@
 // Armada (Fleet management): data EV, servis rutin, laporan kerusakan, pindah DS.
 // Super-admin kelola semua; Arcon kelola penuh di DS yang dipegang; Captain melihat motor DS-nya dan melaporkan kerusakan.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Bike, ClipboardList, Wrench, Warehouse, X } from 'lucide-react'
 import { sb, today, useRows, ok, toast, konfirmasi, Err, Field, Select, Stat, Kosong, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 import { angka, BadgeStatus, rupiah, ServisBerikutnya, tgl, type ItemServis, type Motor, type Permintaan, type Pindah, type RingkasanPermintaan, type Rusak, type Servis } from './armada-lib'
@@ -156,8 +156,8 @@ function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPi
               {pg.rows.map((m) => (
                 <tr key={m.id} className={m.id === pilih ? 'bg-primary-soft/60' : ''}>
                   {kelola && <td><input type="checkbox" aria-label={`Pilih ${m.kode_motor}`} checked={dipilih.has(m.id)} onChange={() => centang(m.id)} /></td>}
-                  <td className="font-mono font-medium">{m.kode_motor}</td>
-                  <td>{m.plat_nomor ?? '–'}</td>
+                  <td className="whitespace-nowrap font-mono font-medium">{m.kode_motor}</td>
+                  <td className="whitespace-nowrap">{m.plat_nomor ?? '–'}</td>
                   <td>{[m.merek, m.model, m.tahun].filter(Boolean).join(' ') || '–'}</td>
                   <td>{dsNama(m.ds_id)}</td>
                   <td>{riderNama(m.dipegang_oleh)}</td>
@@ -264,9 +264,14 @@ function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis
     <button className={mode === k ? 'btn' : 'btn2'} onClick={() => setMode(mode === k ? null : k)}>{label}</button>
   )
   const pemegang = riderNama(m.dipegang_oleh)
+  // Panel dirender di atas daftar: di HP, yang menekan Detail ada jauh di bawah, jadi panelnya digulir ke layar
+  const panel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    panel.current?.scrollIntoView({ block: 'start' })
+  }, [])
 
   return (
-    <div className="card">
+    <div className="card scroll-mt-4" ref={panel}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="text-lg font-bold font-mono">{m.kode_motor}</h3>
         <BadgeStatus s={m.status} />

@@ -212,8 +212,8 @@ export function TemaSwitch() {
 export function Stat({ icon: Icon, label, value, tone = 'brand' }: { icon: LucideIcon; label: string; value: ReactNode; tone?: 'brand' | 'red' | 'zinc' }) {
   const warna = { brand: 'bg-primary-soft text-primary', red: 'bg-danger-soft text-danger', zinc: 'bg-muted text-muted-foreground' }[tone]
   return (
-    <div className="stat flex items-center gap-4">
-      <div className={`size-12 shrink-0 rounded-xl flex items-center justify-center ${warna}`}><Icon size={22} /></div>
+    <div className="stat flex items-center gap-3 !p-3 sm:gap-4 sm:!p-4">
+      <div className={`size-10 shrink-0 rounded-xl flex items-center justify-center sm:size-12 ${warna}`}><Icon size={22} /></div>
       <div className="min-w-0">
         <b className={tone === 'red' ? '!text-danger' : ''}>{value}</b>
         <span>{label}</span>
@@ -344,17 +344,21 @@ export function Select({ value, onChange, opsi, placeholder = 'Pilih…', classN
   const tampil = opsi.filter((o) => !q || o.label.toLowerCase().includes(q.toLowerCase()))
   const terpilih = opsi.find((o) => o.value === value)
 
-  const bukaDaftar = () => {
-    const r = tombol.current!.getBoundingClientRect()
-    const bawah = window.innerHeight - r.bottom
+  // Posisi daftar mengikuti area yang benar-benar terlihat (visualViewport: menyusut saat keyboard HP muncul)
+  const hitungPos = (r: DOMRect) => {
+    const vv = window.visualViewport
+    const bawah = (vv ? vv.height + vv.offsetTop : window.innerHeight) - r.bottom
     const keAtas = bawah < 280 && r.top > bawah
     const width = Math.max(r.width, 224)
-    setPos({
+    return {
       left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
       width,
       ...(keAtas ? { bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6 }),
-      maxH: Math.min(340, (keAtas ? r.top : bawah) - 16),
-    })
+      maxH: Math.max(120, Math.min(340, (keAtas ? r.top : bawah) - 16)),
+    }
+  }
+  const bukaDaftar = () => {
+    setPos(hitungPos(tombol.current!.getBoundingClientRect()))
     setQ('')
     setAktif(Math.max(0, opsi.findIndex((o) => o.value === value)))
     setBuka(true)
@@ -373,18 +377,26 @@ export function Select({ value, onChange, opsi, placeholder = 'Pilih…', classN
     const luar = (e: Event) => {
       if (!kotak.current?.contains(e.target as Node) && !tombol.current?.contains(e.target as Node)) setBuka(false)
     }
-    const gulir = (e: Event) => {
-      if (!kotak.current?.contains(e.target as Node)) setBuka(false)
+    // Gulir halaman atau keyboard HP muncul: daftar ikut pindah, bukan menutup (fokus ke kolom cari memicu gulir/resize di HP).
+    // Daftar baru menutup kalau tombolnya sudah keluar dari layar.
+    const susun = () => {
+      const r = tombol.current?.getBoundingClientRect()
+      if (!r || r.bottom < 0 || r.top > window.innerHeight) return setBuka(false)
+      setPos(hitungPos(r))
     }
-    const ukuran = () => setBuka(false)
+    const gulir = (e: Event) => {
+      if (!kotak.current?.contains(e.target as Node)) susun()
+    }
     document.addEventListener('mousedown', luar)
     window.addEventListener('scroll', gulir, true)
-    window.addEventListener('resize', ukuran)
-    setTimeout(() => (bisaCari ? kolomCari.current : kotak.current)?.focus(), 0)
+    window.addEventListener('resize', susun)
+    window.visualViewport?.addEventListener('resize', susun)
+    setTimeout(() => (bisaCari ? kolomCari.current : kotak.current)?.focus({ preventScroll: true }), 0)
     return () => {
       document.removeEventListener('mousedown', luar)
       window.removeEventListener('scroll', gulir, true)
-      window.removeEventListener('resize', ukuran)
+      window.removeEventListener('resize', susun)
+      window.visualViewport?.removeEventListener('resize', susun)
     }
   }, [buka, bisaCari])
 

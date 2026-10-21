@@ -102,7 +102,7 @@ function SelKuota({ nP, nS, k, editable, ringkas, ubah }: { nP: number; nS: numb
   const wP = warnaKuota(nP, k.pagi, lebih, k.cadangan)
   const wS = warnaKuota(nS, k.siang, lebih, k.cadangan)
   const input = (f: 'pagi' | 'siang' | 'cadangan', v: number, judul: string) => (
-    <input type="number" min={0} title={judul} aria-label={judul} value={v} onChange={(e) => ubah(f, e.target.value)} className={`inp !px-0.5 !py-0 text-center font-mono text-[11px] ${ringkas ? 'w-8' : 'w-10'}`} />
+    <input type="number" min={0} title={judul} aria-label={judul} value={v} onChange={(e) => ubah(f, e.target.value)} className={`inp !px-0.5 !py-0 text-center font-mono text-[11px] [@media(pointer:coarse)]:!h-9 [@media(pointer:coarse)]:!text-base ${ringkas ? 'w-8 [@media(pointer:coarse)]:w-10' : 'w-10 [@media(pointer:coarse)]:w-12'}`} />
   )
   if (!editable)
     return (
@@ -477,7 +477,7 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
         <table className="w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 min-w-60 border-b border-border bg-card px-4 py-3 text-left font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rider</th>
+              <th className="sticky left-0 z-10 w-32 min-w-32 border-b border-border bg-card px-2 py-3 text-left md:w-auto md:min-w-60 md:px-4 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rider</th>
               {days.map((d, i) => {
                 const hariIni = d === today()
                 const akhirPekan = ['Sab', 'Min'].includes(namaHari(d))
@@ -498,11 +498,11 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
               const kerja = days.filter((d) => kerjaShift(g[`${r.id}|${d}`])).length
               return (
                 <tr key={r.id} className="group">
-                  <td className="sticky left-0 z-10 whitespace-nowrap border-b border-border/60 bg-card px-4 py-2 transition-colors group-hover:bg-primary-soft">
+                  <td className="sticky left-0 z-10 border-b border-border/60 bg-card px-2 py-2 transition-colors group-hover:bg-primary-soft md:whitespace-nowrap md:px-4">
                     <div className="flex items-center gap-3">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-bold text-muted-foreground">{i + 1}</span>
-                      <div className="leading-tight">
-                        <div className="font-medium">{r.nama}</div>
+                      <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-bold text-muted-foreground md:flex">{i + 1}</span>
+                      <div className="min-w-0 leading-tight">
+                        <div className="text-[13px] font-medium md:text-sm">{r.nama}</div>
                         <div className="font-mono text-[11px] text-muted-foreground">{r.kode_mtr}</div>
                       </div>
                     </div>
@@ -529,9 +529,9 @@ export function JadwalGrid({ ds, editable, awalDari }: { ds: Ds; editable: boole
           </tbody>
           <tfoot>
             <tr>
-              <td className="sticky left-0 z-10 bg-muted px-4 py-3 text-xs font-semibold">
+              <td className="sticky left-0 z-10 bg-muted px-2 py-3 text-xs font-semibold md:px-4">
                 Terisi / kebutuhan client
-                <div className="font-normal text-[11px] text-muted-foreground">P = pagi, S = siang, cad = rider cadangan{editable ? '. Angka kebutuhan bisa diubah per hari.' : ''}</div>
+                <div className="hidden font-normal text-[11px] text-muted-foreground md:block">P = pagi, S = siang, cad = rider cadangan{editable ? '. Angka kebutuhan bisa diubah per hari.' : ''}</div>
               </td>
               {days.map((d) => (
                 <td key={d} className={`py-2.5 ${padat ? 'px-0.5' : 'px-3'} ${d === today() ? 'bg-primary-soft' : 'bg-muted'}`}>
