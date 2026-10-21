@@ -130,7 +130,7 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
         <form onSubmit={submit} className="w-full max-w-sm">
           <div className="md:hidden flex items-center gap-3 mb-8">
             <Logo />
-            <div className="font-display font-bold text-xl">Dash ORCA</div>
+            <div className="font-brand text-xl leading-none"><span className="font-medium">DASH </span><span className="font-extrabold text-primary">ORCA</span></div>
           </div>
           <h1 className="text-2xl font-bold mb-1">Masuk</h1>
           <p className="text-sm text-muted-foreground mb-6">Pilih cara masuk sesuai peran Anda.</p>
@@ -204,7 +204,7 @@ function LupaPassword({ emailAwal, balik }: { emailAwal: string; balik: () => vo
     <form onSubmit={kirim} className="w-full max-w-sm">
       <div className="md:hidden flex items-center gap-3 mb-8">
         <Logo />
-        <div className="font-display font-bold text-xl">Dash ORCA</div>
+        <div className="font-brand text-xl leading-none"><span className="font-medium">DASH </span><span className="font-extrabold text-primary">ORCA</span></div>
       </div>
       <h1 className="text-2xl font-bold mb-1">Lupa password</h1>
       <p className="text-sm text-muted-foreground mb-6">Masukkan email akun Anda. Kami kirim tautan untuk membuat password baru. Cara ini juga dipakai untuk membuat password pertama kali.</p>
@@ -256,7 +256,7 @@ function PasswordBaru({ selesai }: { selesai: () => void }) {
       <form onSubmit={simpan} className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8">
           <Logo />
-          <div className="font-display font-bold text-xl">Dash ORCA</div>
+          <div className="font-brand text-xl leading-none"><span className="font-medium">DASH </span><span className="font-extrabold text-primary">ORCA</span></div>
         </div>
         <h1 className="text-2xl font-bold mb-1">Buat password baru</h1>
         <p className="text-sm text-muted-foreground mb-6">Pilih password yang mudah Anda ingat tapi sulit ditebak. Minimal 8 karakter.</p>
@@ -317,8 +317,8 @@ function AdminApp({ email }: { email: string }) {
         <div className="flex items-center gap-3 px-2 mb-8 mt-1">
           <Logo small />
           <div>
-            <div className="font-display font-bold text-white leading-none">Dash</div>
-            <div className="font-mono text-[10px] tracking-widest uppercase mt-1">ORCA</div>
+            <div className="font-brand text-lg leading-none text-white"><span className="font-medium">DASH </span><span className="font-extrabold">ORCA</span></div>
+            <div className="text-[10px] tracking-wide mt-1.5 text-white/50">Orbit &amp; Cadence</div>
           </div>
         </div>
         <nav className="space-y-1 flex-1">

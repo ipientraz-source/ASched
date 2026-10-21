@@ -138,9 +138,10 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
 
-  --font-sans: 'Manrope', system-ui, sans-serif;
-  --font-display: 'Sora', 'Manrope', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+  --font-brand: 'Unbounded', 'Bricolage Grotesque', system-ui, sans-serif;
 }
 
 body {
