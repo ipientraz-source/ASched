@@ -1,10 +1,55 @@
 // Uji logika import dari file absensi (src/impor.ts). Node 24 membaca TypeScript langsung.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cocokDs, namaDsBaru, ringkasPerRider } from '../src/impor.ts'
+import { bacaCsvMotor, cocokDs, namaDsBaru, normPlat, ringkasPerRider, siapkanMotor, tahunDariVin } from '../src/impor.ts'
 
 const DS = ['DS ABDESIR', 'DS ALAM SUTRA', 'DS BALIKPAPAN', 'DS GALAXY', 'DS GOWA', 'DS HAYAM WURUK', 'DS PEMURUS', 'DS TIKALA ARES', 'DS UJUNG ASPAL', 'DS UJUNG PANDANG MAKASSAR']
 const baris = (kode, nama, ds, n = 1) => ({ baris: n, kode_mtr: kode, nama, no_hp: '', ds, status: '' })
+
+const CSV_MOTOR = [
+  ['DS Location', 'License Plate', 'VIN'],
+  ['Dark Store Alfagift -  Antapani', 'B 5608 SWF', 'MH2AEB1H8TJ000550'],
+  ['Dark Store Alfagift - Galaxy', 'B 4785 SWY', 'MH2AEB1H0TJ000218'],
+  ['Dark Store Alfagift - Alam Sutera', 'B4672SWN', 'MH2AEB1H4SJ002956'],
+  ['DS Hayam Wuruk', 'b  5592 swf', 'MH2AEB1H0TJ000509'],
+  ['Grand Total', '', ''],
+]
+
+test('impor motor: kolom dikenali (nama bebas), baris Grand Total dibuang, plat dirapikan, tahun dari VIN', () => {
+  const { baris, galat } = bacaCsvMotor(CSV_MOTOR)
+  assert.equal(galat, '')
+  assert.equal(baris.length, 4) // Grand Total tanpa plat/VIN tidak ikut
+  assert.deepEqual(baris.map((b) => normPlat(b.plat)), ['B 5608 SWF', 'B 4785 SWY', 'B 4672 SWN', 'B 5592 SWF'])
+  assert.equal(tahunDariVin('MH2AEB1H8TJ000550'), 2026) // T
+  assert.equal(tahunDariVin('MH2AEB1H4SJ002956'), 2025) // S
+  assert.equal(tahunDariVin('PENDEK'), null)
+  assert.match(bacaCsvMotor([['Nama', 'Warna'], ['a', 'b']]).galat, /Kolom wajib/)
+  // nama kolom lain tetap dikenali, VIN opsional
+  assert.equal(bacaCsvMotor([['Lokasi', 'Nopol'], ['DS X', 'B 1 AA']]).baris[0].vin, '')
+})
+
+test('impor motor: lokasi dicocokkan ke DS yang ada; plat/VIN terdaftar atau dobel dan DS belum ada ditandai', () => {
+  const { baris } = bacaCsvMotor(CSV_MOTOR)
+  const ds = ['DS GALAXY', 'DS HAYAM WURUK', 'DS ALAM SUTRA']
+  const kosong = { plat: [], vin: [], kode: [] }
+  const h = siapkanMotor(baris, ds, kosong, true)
+  assert.deepEqual(h.map((x) => x.ds), [null, 'DS GALAXY', 'DS ALAM SUTRA', 'DS HAYAM WURUK']) // Antapani belum ada
+  assert.equal(h[0].dsBaru, 'DS ANTAPANI')
+  assert.deepEqual(h.map((x) => x.masalah), ['', '', '', '']) // DS baru boleh dibuat
+  assert.deepEqual(h.map((x) => x.kode), ['B 5608 SWF', 'B 4785 SWY', 'B 4672 SWN', 'B 5592 SWF']) // kode = plat
+  assert.equal(h[0].tahun, 2026)
+  // DS baru tidak boleh dibuat → baris itu ditolak
+  assert.equal(siapkanMotor(baris, ds, kosong, false)[0].masalah, 'DS belum ada')
+  // sudah terdaftar (plat atau VIN) dan dobel di dalam file
+  const ada = siapkanMotor(baris, ds, { plat: ['B 4785 SWY'], vin: ['mh2aeb1h0tj000509'], kode: [] }, true)
+  assert.equal(ada[1].masalah, 'Plat sudah terdaftar')
+  assert.equal(ada[3].masalah, 'VIN sudah terdaftar')
+  const dobel = siapkanMotor([...baris, { baris: 9, lokasi: 'DS Hayam Wuruk', plat: 'B 5608 SWF', vin: '' }], ds, kosong, true)
+  assert.equal(dobel[0].masalah, 'Plat dobel di file')
+  assert.equal(dobel[4].masalah, 'Plat dobel di file')
+  // VIN rusak
+  assert.match(siapkanMotor([{ baris: 2, lokasi: 'DS Galaxy', plat: 'B 1 AA', vin: 'ABC123' }], ds, kosong, true)[0].masalah, /VIN harus 17/)
+})
 
 test('14 lokasi di file absensi: 10 cocok ke DS yang ada, 4 belum punya DS', () => {
   const lokasi = {

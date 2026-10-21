@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { sb, useRows, ok, toast, konfirmasi, Err, Field, RiderPick, Select, usePage, Pagination, type Ds, type Rider } from './lib'
 
 // Buat / ganti password akun login lewat edge function (service role ada di server, bukan di browser)
@@ -74,8 +74,12 @@ export function Kelola() {
 
       <ArconTim arcons={rs.rows.filter((r) => r.peran === 'arcon')} semuaDs={dsl.rows} reload={rs.reload} />
 
-      <div className="flex items-center gap-3 mb-3">
-        <input className="inp w-72 max-w-full" placeholder="Cari DS atau nama Captain…" value={cari} onChange={(e) => setCari(e.target.value)} />
+      <div className="mb-3 mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
+        <h2 className="mr-2 text-lg font-bold">Daftar DS</h2>
+        <div className="relative">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input className="inp w-72 max-w-full !pl-9" placeholder="Cari DS atau nama Captain…" aria-label="Cari DS" value={cari} onChange={(e) => setCari(e.target.value)} />
+        </div>
         <span className="text-sm text-muted-foreground">{tampil.length} DS</span>
       </div>
       {pg.rows.map((d) => (
