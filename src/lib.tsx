@@ -474,14 +474,9 @@ export const Field = ({ label, hint, children, className = '' }: { label: string
   </div>
 )
 
-// Ikon ORCA tanpa kotak: cincin pink, penunjuk dan titik mengikuti warna teks sekitarnya (putih di latar gelap, gelap di latar terang)
+// Ikon ORCA (tile navy, cincin ber-outline putih): berkas yang sama dengan ikon tab browser
 export const Logo = ({ small }: { small?: boolean }) => (
-  <svg viewBox="80 80 352 352" role="img" aria-label="Dash ORCA" className={`${small ? 'size-9' : 'size-12'} shrink-0`}>
-    <circle cx="256" cy="274" r="126" fill="none" stroke="#ff5a8a" strokeWidth="46" />
-    <path d="M256 105 L323 183 L256 213 L189 183 Z" fill="currentColor" />
-    <circle cx="256" cy="97" r="9" fill="currentColor" />
-    <circle cx="256" cy="274" r="35" fill="currentColor" />
-  </svg>
+  <img src="/favicon.svg" alt="Dash ORCA" className={`${small ? 'size-9' : 'size-12'} shrink-0 drop-shadow-md`} />
 )
 
 export const Kosong = ({ teks, hint }: { teks: string; hint?: string }) => (
