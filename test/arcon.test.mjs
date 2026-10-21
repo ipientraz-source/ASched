@@ -122,7 +122,7 @@ test('Arcon hanya memantau: tidak bisa menyusun jadwal, mengisi absensi, tarik r
     await assert.rejects(q("insert into actual_harian (tanggal, rider_id, ds_id, status) values (today_wib(), $1, $2, 'alpha')", [R_G, GALAXY]), /row-level security/)
     assert.equal((await q("update riders set status = 'nonaktif' where id = $1 returning id", [R_G])).length, 0)
     assert.equal((await q('update ds set kuota_pagi = 9 where id = $1 returning id', [GALAXY])).length, 0)
-    await assert.rejects(q("select set_arcon($1::uuid, $2::uuid, 'x@y.z')", [GOWA, R_AA]), /Hanya Super-admin/)
+    await assert.rejects(q("select pilih_arcon($1::uuid, $2::uuid)", [GOWA, R_AA]), /Hanya Super-admin/)
     await assert.rejects(q('select lepas_arcon($1::uuid)', [GALAXY]), /Hanya Super-admin/)
   })
 })
@@ -237,39 +237,50 @@ test('Kuota per hari mengikuti permintaan client: Captain DS-nya / Super-admin b
   })
 })
 
-test('Super-admin menunjuk Arcon: satu Arcon banyak DS; Captain tak bisa merangkap; Arcon lama diturunkan', async () => {
+test('Super-admin memilih Arcon di DS: Arcon bukan rider (tim khusus), satu Arcon banyak DS, Arcon lama tetap Arcon', async () => {
   await as(S, async () => {
-    await assert.rejects(q("select set_arcon($1::uuid, $2::uuid, 'x@y.z')", [GALAXY, R_CG]), /Captain/) // Captain tak bisa jadi Arcon
-    await assert.rejects(q("select set_arcon($1::uuid, $2::uuid, '')", [GALAXY, R_AA]), /Email Arcon wajib/)
-    await assert.rejects(q("select set_arcon($1::uuid, $2::uuid, 'x@y.z')", [GALAXY, id(1)]), /tidak bisa dijadikan Arcon/)
+    // hanya orang berperan Arcon yang bisa dipilih: rider, Captain, dan Super-admin ditolak
+    await assert.rejects(q('select pilih_arcon($1::uuid, $2::uuid)', [GALAXY, R_CG]), /Arcon tidak ditemukan/)
+    await assert.rejects(q('select pilih_arcon($1::uuid, $2::uuid)', [GALAXY, R_G]), /Arcon tidak ditemukan/)
+    await assert.rejects(q('select pilih_arcon($1::uuid, $2::uuid)', [GALAXY, id(1)]), /Arcon tidak ditemukan/)
     await assert.rejects(q("select tunjuk_captain($1::uuid, $2::uuid, 'x@y.z')", [ALSUT, R_AA]), /Rider tidak ditemukan/) // Arcon tak bisa jadi Captain
-    // Gowa dipindah ke Arcon A (kini memegang 3 DS) → Arcon B kehilangan DS terakhirnya
-    await q("select set_arcon($1::uuid, $2::uuid, ' Arcon-A@Test.Local ')", [GOWA, R_AA])
+    // Arcon baru dibuat langsung sebagai pengguna Arcon (bukan dari rider), lalu dipilih
+    const baru = (await q("insert into riders (nama, email, peran) values ('Arcon Baru', ' Arcon-C@Test.Local ', 'arcon') returning id, email, kode_mtr"))[0]
+    assert.equal(baru.email, 'arcon-c@test.local')
+    assert.equal(baru.kode_mtr, null) // tanpa Kode MTR: bukan rider
+    await q('select pilih_arcon($1::uuid, $2::uuid)', [GALAXY, baru.id])
+    // Gowa dipindah ke Arcon A (kini memegang 3 DS) → Arcon B kehilangan DS terakhirnya tapi tetap Arcon
+    await q('select pilih_arcon($1::uuid, $2::uuid)', [GOWA, R_AA])
+    assert.equal((await q('select count(*)::int n from ds where arcon_id = $1', [R_AA]))[0].n, 2)
+    assert.equal((await q('select peran from riders where id = $1', [R_AB]))[0].peran, 'arcon')
+    await q('select pilih_arcon($1::uuid, $2::uuid)', [GALAXY, R_AA]) // kembalikan Galaxy ke Arcon A
     assert.equal((await q('select count(*)::int n from ds where arcon_id = $1', [R_AA]))[0].n, 3)
-    assert.equal((await q('select peran from riders where id = $1', [R_AB]))[0].peran, 'rider')
-    assert.equal((await q('select email from riders where id = $1', [R_AA]))[0].email, 'arcon-a@test.local')
+    // Arcon nonaktif tidak bisa dipilih
+    await q("update riders set status = 'nonaktif' where id = $1", [baru.id])
+    await assert.rejects(q('select pilih_arcon($1::uuid, $2::uuid)', [ALSUT, baru.id]), /Arcon tidak ditemukan atau nonaktif/)
   })
   await as(AA, async () => {
     assert.ok((await nama()).includes('Rider Gowa')) // sekarang ikut memantau Gowa
   })
   await as(AB, async () => {
-    assert.equal((await q('select * from riders')).length, 0) // bukan Arcon lagi, tak melihat apa pun
+    assert.deepEqual(await nama(), ['Arcon B']) // tak memegang DS: tidak melihat rider/Captain, hanya dirinya
+    assert.equal((await q('select * from jadwal')).length, 0)
   })
 })
 
-test('Melepas Arcon dari semua DS menurunkannya jadi rider dan menutup aksesnya; anon tak bisa memanggil', async () => {
+test('Melepas Arcon dari semua DS menutup aksesnya tapi orangnya tetap Arcon; anon tak bisa memanggil', async () => {
   await as(S, async () => {
     await q('select lepas_arcon($1::uuid)', [GOWA])
     await q('select lepas_arcon($1::uuid)', [GALAXY])
-    assert.equal((await q('select peran from riders where id = $1', [R_AA]))[0].peran, 'arcon') // masih pegang Alsut
     await q('select lepas_arcon($1::uuid)', [ALSUT])
-    assert.equal((await q('select peran from riders where id = $1', [R_AA]))[0].peran, 'rider')
+    assert.equal((await q('select peran from riders where id = $1', [R_AA]))[0].peran, 'arcon') // tidak diturunkan jadi rider
+    assert.equal((await q('select count(*)::int n from ds where arcon_id = $1', [R_AA]))[0].n, 0)
   })
   await as(AA, async () => {
-    assert.equal((await q('select * from riders')).length, 0)
+    assert.deepEqual(await nama(), ['Arcon A']) // tanpa DS: tak melihat apa pun selain dirinya
     assert.equal((await q('select * from jadwal')).length, 0)
   })
   await as(null, async () => {
-    await assert.rejects(q("select set_arcon($1::uuid, $2::uuid, 'x@y.z')", [GOWA, R_AA]), /permission denied/)
+    await assert.rejects(q('select pilih_arcon($1::uuid, $2::uuid)', [GOWA, R_AA]), /permission denied/)
   })
 })
