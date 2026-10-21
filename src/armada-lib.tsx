@@ -11,7 +11,7 @@ export type Motor = {
 }
 export type Servis = {
   id: string; motor_id: string; tanggal: string; jenis: string; jenis_lain: string | null; bengkel: string | null; kilometer: number | null
-  biaya: number; ditanggung_asuransi: boolean; catatan: string | null; foto: string[]
+  biaya: number; ditanggung_asuransi: boolean; catatan: string | null; foto: string[]; pekerjaan: string[]
 }
 export type Rusak = {
   id: string; motor_id: string; tanggal: string; jenis: string; jenis_lain: string | null; keparahan: 'ringan' | 'sedang' | 'berat'
@@ -22,7 +22,7 @@ export type Pindah = { id: string; motor_id: string; dari_ds: string | null; ke_
 
 export type Permintaan = {
   id: string; judul: string; jenis: string; tenggat: string | null; catatan: string | null; status: 'berjalan' | 'selesai'
-  dibuat_oleh: string | null; dibuat: string; ditutup: string | null
+  dibuat_oleh: string | null; dibuat: string; ditutup: string | null; pekerjaan: string[]; urgent: boolean
 }
 export type ItemServis = {
   id: string; permintaan_id: string; motor_id: string; status: 'diminta' | 'dijadwalkan' | 'selesai' | 'dilewati'
@@ -33,6 +33,29 @@ export type RingkasanPermintaan = { permintaan_id: string; total: number; selesa
 export const JENIS_SERVIS = ['Servis rutin', 'Ganti baterai', 'Ganti ban', 'Ganti rem', 'Cek kelistrikan', 'Lainnya']
 export const JENIS_RUSAK = ['Ban bocor / pecah', 'Rem', 'Baterai', 'Charger / konektor', 'Motor penggerak (hub)', 'Kontroler', 'Lampu / kelistrikan', 'Bodi / jatuh / tabrakan', 'Spion', 'Kunci / kontak', 'Suspensi', 'Lainnya']
 export const MAKS_FOTO = 4
+export const PART_SERVIS = ['Ban depan', 'Ban belakang', 'Kampas rem', 'Minyak rem', 'Oli gardan', 'Baterai', 'Lampu / kelistrikan', 'Suspensi', 'Spion', 'Kunci / kontak']
+
+export const BadgeUrgent = () => <span className="badge bg-danger font-bold text-white">URGENT</span>
+
+// Daftar part yang diganti: kotak centang untuk part umum + isian bebas (pisahkan dengan koma) untuk part lain
+export function PilihPart({ value, ubah }: { value: string[]; ubah: (v: string[]) => void }) {
+  const [lain, setLain] = useState(() => value.filter((p) => !PART_SERVIS.includes(p)).join(', '))
+  const tukar = (p: string) => ubah(value.includes(p) ? value.filter((x) => x !== p) : [...value, p])
+  const ketik = (t: string) => {
+    setLain(t)
+    ubah([...value.filter((x) => PART_SERVIS.includes(x)), ...t.split(',').map((x) => x.trim()).filter(Boolean)])
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+        {PART_SERVIS.map((p) => (
+          <label key={p} className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={value.includes(p)} onChange={() => tukar(p)} />{p}</label>
+        ))}
+      </div>
+      <input className="inp w-full max-w-md" placeholder="Part lain (pisahkan dengan koma)" value={lain} onChange={(e) => ketik(e.target.value)} />
+    </div>
+  )
+}
 
 export const rupiah = (n: number) => `Rp ${Number(n).toLocaleString('id-ID')}`
 export const angka = (s: string) => parseInt(s.replace(/\D/g, ''), 10) || 0

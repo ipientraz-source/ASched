@@ -238,6 +238,41 @@ test('Pengajuan servis: dibuat Super-admin/Arcon untuk semua motor di cakupan, s
   })
 })
 
+test('Pengajuan massal (motor dipilih + daftar part) oleh Arcon, dan servis mendesak oleh Captain', async () => {
+  const M9 = id(204)
+  await db.exec(`insert into motor (id, kode_motor, ds_id) values ('${M9}', 'EV-009', '${GOWA}')`)
+  const ajukan = (motors, parts = [], judul = 'Servis rutin + ganti part') =>
+    q("select buat_permintaan_servis($1, 'Servis rutin', null, null, null, $2::uuid[], $3::text[]) id", [judul, motors, parts]).then((r) => r[0].id)
+  let pid
+  await as(CG, async () => await assert.rejects(ajukan([M3]), /Hanya Super-admin atau Arcon/)) // Captain tidak mengajukan rutin
+  await as(AA, async () => {
+    await assert.rejects(ajukan([]), /Pilih minimal satu motor/)
+    await assert.rejects(ajukan([M1, M9]), /bukan milik Anda/) // M9 ada di Gowa
+    pid = await ajukan([M1, M3], ['Ganti ban', 'Ganti rem'])
+    const it = await q('select m.kode_motor from permintaan_servis_item i join motor m on m.id = i.motor_id where i.permintaan_id = $1 order by 1', [pid])
+    assert.deepEqual(it.map((x) => x.kode_motor), ['EV-001', 'EV-003']) // hanya motor yang dipilih
+    assert.deepEqual((await q('select pekerjaan from permintaan_servis where id = $1', [pid]))[0].pekerjaan, ['Ganti ban', 'Ganti rem'])
+    await q("insert into servis_motor (motor_id, tanggal, jenis, pekerjaan) values ($1, today_wib(), 'Servis rutin', $2::text[])", [M1, ['Ganti ban', 'Ganti rem']])
+    const s = (await q('select pekerjaan from servis_motor where motor_id = $1 and cardinality(pekerjaan) > 0', [M1]))[0]
+    assert.deepEqual(s.pekerjaan, ['Ganti ban', 'Ganti rem']) // part yang diganti tersimpan di catatan servis
+  })
+  await as(AB, async () => await assert.rejects(ajukan([M1]), /bukan milik Anda/)) // motor DS lain
+  const mendesak = (motor, alasan = 'Ban belakang bocor, motor tidak bisa jalan') => q('select ajukan_servis_mendesak($1::uuid, $2) id', [motor, alasan]).then((r) => r[0].id)
+  let urg
+  await as(CG, async () => {
+    await assert.rejects(mendesak(M1), /tidak berwenang/) // motor DS lain
+    await assert.rejects(mendesak(M3, '  '), /Alasan servis mendesak wajib/)
+    urg = await mendesak(M3)
+    const h = (await q('select urgent, judul from permintaan_servis where id = $1', [urg]))[0]
+    assert.deepEqual([h.urgent, h.judul], [true, 'Servis mendesak EV-003'])
+    await assert.rejects(mendesak(M3), /sudah punya pengajuan servis mendesak/)
+  })
+  await as(CA, async () => assert.equal((await q('select * from permintaan_servis where id = $1', [urg])).length, 0)) // Captain DS lain tidak melihat
+  await as(AA, async () => assert.equal((await q('select * from permintaan_servis where id = $1', [urg])).length, 1)) // Arcon DS-nya melihat
+  await as(AB, async () => assert.equal((await q('select * from permintaan_servis where id = $1', [urg])).length, 0))
+  await as(null, async () => await assert.rejects(mendesak(M3), /permission denied/))
+})
+
 test('Foto di Storage: nama berkas {motor_id}/..., akses mengikuti hak lihat motor, hapus hanya Super-admin dan Arcon', async () => {
   const boleh = (nama, hapus) => q('select armada_boleh($1, $2) b', [nama, hapus]).then((r) => r[0].b)
   await as(CA, async () => {

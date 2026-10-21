@@ -1,7 +1,7 @@
 // Fleet management: catatan servis dan laporan kerusakan (form + daftar).
 import { useState } from 'react'
 import { sb, today, ok, toast, Field, Select, type Me, type Rider } from './lib'
-import { angka, BadgeParah, BadgeRusak, FotoGaleri, FotoPicker, InputRupiah, JENIS_RUSAK, JENIS_SERVIS, namaJenis, rupiah, tgl, type Rusak, type Servis } from './armada-lib'
+import { angka, BadgeParah, BadgeRusak, FotoGaleri, FotoPicker, InputRupiah, JENIS_RUSAK, JENIS_SERVIS, namaJenis, PilihPart, rupiah, tgl, type Rusak, type Servis } from './armada-lib'
 
 const opsi = (l: string[]) => l.map((v) => ({ value: v, label: v }))
 
@@ -35,6 +35,7 @@ export function FormServis({ motorId, selesai }: { motorId: string; selesai: () 
   const [asuransi, setAsuransi] = useState(false)
   const [biaya, setBiaya] = useState('')
   const [catatan, setCatatan] = useState('')
+  const [pekerjaan, setPekerjaan] = useState<string[]>([])
   const [foto, setFoto] = useState<string[]>([])
 
   async function simpan() {
@@ -42,7 +43,7 @@ export function FormServis({ motorId, selesai }: { motorId: string; selesai: () 
     const sukses = await ok(
       sb.from('servis_motor').insert({
         motor_id: motorId, tanggal, jenis, jenis_lain: jenis === 'Lainnya' ? lain.trim() : null, bengkel: bengkel.trim() || null,
-        kilometer: km ? angka(km) : null, biaya: asuransi ? 0 : angka(biaya), ditanggung_asuransi: asuransi, catatan: catatan.trim() || null, foto,
+        kilometer: km ? angka(km) : null, biaya: asuransi ? 0 : angka(biaya), ditanggung_asuransi: asuransi, catatan: catatan.trim() || null, foto, pekerjaan,
       }),
     )
     if (!sukses) return
@@ -60,6 +61,7 @@ export function FormServis({ motorId, selesai }: { motorId: string; selesai: () 
         <Field label="Kilometer (opsional)"><input className="inp w-full" inputMode="numeric" value={km} onChange={(e) => setKm(e.target.value.replace(/\D/g, '').slice(0, 7))} /></Field>
       </div>
       <BiayaAsuransi asuransi={asuransi} setAsuransi={setAsuransi} biaya={biaya} setBiaya={setBiaya} />
+      <Field label="Part yang diganti (opsional)" hint="Centang part yang diganti pada servis ini."><PilihPart value={pekerjaan} ubah={setPekerjaan} /></Field>
       <Field label="Catatan (opsional)"><textarea className="inp w-full" rows={2} value={catatan} onChange={(e) => setCatatan(e.target.value)} /></Field>
       <FotoPicker motorId={motorId} value={foto} ubah={setFoto} />
       <button className="btn" onClick={simpan}>Simpan servis</button>
@@ -78,7 +80,10 @@ export function TabelServis({ rows, motorNama }: { rows: Servis[]; motorNama?: (
             <tr key={s.id}>
               <td>{tgl(s.tanggal)}</td>
               {motorNama && <td className="font-mono text-xs">{motorNama(s.motor_id)}</td>}
-              <td className="font-medium">{namaJenis(s)}</td>
+              <td>
+                <div className="font-medium">{namaJenis(s)}</div>
+                {s.pekerjaan?.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{s.pekerjaan.map((p) => <span key={p} className="badge bg-muted text-foreground/80">{p}</span>)}</div>}
+              </td>
               <td>{s.bengkel ?? '–'}</td>
               <td className="font-mono">{s.kilometer?.toLocaleString('id-ID') ?? '–'}</td>
               <td><Biaya biaya={s.biaya} asuransi={s.ditanggung_asuransi} /></td>

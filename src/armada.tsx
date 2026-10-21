@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { AlertTriangle, Bike, ClipboardList, Wrench, Warehouse, X } from 'lucide-react'
 import { sb, today, useRows, ok, toast, konfirmasi, Err, Field, Select, Stat, Kosong, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 import { angka, BadgeStatus, rupiah, ServisBerikutnya, tgl, type ItemServis, type Motor, type Permintaan, type Pindah, type RingkasanPermintaan, type Rusak, type Servis } from './armada-lib'
-import { BagianDiminta } from './armada-diminta'
+import { BagianDiminta, FormPengajuan } from './armada-diminta'
 import { FormLapor, FormServis, ListRusak, namaPelapor, TabelServis } from './armada-catatan'
 
 const STATUS = [{ value: '', label: 'Semua status' }, { value: 'dipakai', label: 'Dipakai' }, { value: 'di gudang', label: 'Di gudang' }, { value: 'perbaikan', label: 'Perbaikan' }]
@@ -67,7 +67,7 @@ export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[]
       {bagian === 'motor' && (
         <BagianMotor
           motors={mts.rows.filter((m) => !fds || m.ds_id === fds)} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={rid.rows} pilih={pilih} setPilih={pilihMotor} detail={detail}
-          servis={srv.rows} rusak={rsk.rows} pindah={pnd.rows} pelapor={pelapor} reload={reloadSemua} modeAwal={modeAwal} diminta={new Set(itb.rows.map((i) => i.motor_id))}
+          servis={srv.rows} rusak={rsk.rows} pindah={pnd.rows} pelapor={pelapor} reload={reloadSemua} modeAwal={modeAwal} diminta={new Set(itb.rows.map((i) => i.motor_id))} keDiminta={() => setBagian('diminta')}
         />
       )}
       {bagian === 'diminta' && (
@@ -85,16 +85,22 @@ export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[]
 }
 
 // ───────── Motor ─────────
-function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPilih, detail, servis, rusak, pindah, pelapor, reload, modeAwal, diminta }: {
+function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPilih, detail, servis, rusak, pindah, pelapor, reload, modeAwal, diminta, keDiminta }: {
   motors: Motor[]; me: Me; kelola: boolean; dsBoleh: Ds[]; dsNama: (id: string | null) => string; riders: Rider[]; pilih: string | null; setPilih: (id: string | null) => void
-  detail: Motor | null; servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; reload: () => void; modeAwal: 'servis' | null; diminta: Set<string>
+  detail: Motor | null; servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; reload: () => void; modeAwal: 'servis' | null; diminta: Set<string>; keDiminta: () => void
 }) {
   const [q, setQ] = useState('')
   const [fst, setFst] = useState('')
   const [tambah, setTambah] = useState(false)
+  // kotak centang (Super-admin dan Arcon): ajukan servis untuk banyak motor sekaligus
+  const [dipilih, setDipilih] = useState<Set<string>>(new Set())
+  const [ajukan, setAjukan] = useState(false)
   const riderNama = (id: string | null) => riders.find((r) => r.id === id)?.nama ?? '–'
   const tampil = motors.filter((m) => (!fst || m.status === fst) && `${m.kode_motor} ${m.plat_nomor ?? ''} ${m.merek ?? ''} ${m.model ?? ''}`.toLowerCase().includes(q.toLowerCase()))
   const pg = usePage(tampil, [q, fst, motors.length])
+  const semua = tampil.length > 0 && tampil.every((m) => dipilih.has(m.id))
+  const idDipilih = [...dipilih].filter((id) => motors.some((m) => m.id === id))
+  const centang = (id: string) => setDipilih((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   return (
     <div>
@@ -119,13 +125,28 @@ function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPi
         {kelola && <button className="btn ml-auto" onClick={() => setTambah(true)}>Tambah motor</button>}
       </div>
 
+      {kelola && idDipilih.length > 0 && (
+        <div className="card">
+          <div className="flex flex-wrap items-center gap-2">
+            <b className="text-sm">{idDipilih.length} molis dicentang</b>
+            <button className="btn" onClick={() => setAjukan(true)}>Ajukan servis untuk yang dicentang</button>
+            <button className="btn2" onClick={() => { setDipilih(new Set()); setAjukan(false) }}>Kosongkan pilihan</button>
+          </div>
+          {ajukan && (
+            <div className="mt-4 border-t border-border pt-4">
+              <FormPengajuan dsBoleh={dsBoleh} motorIds={idDipilih} selesai={() => { setDipilih(new Set()); setAjukan(false); reload(); keDiminta() }} />
+            </div>
+          )}
+        </div>
+      )}
       <div className="card !p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th>Kode</th><th>Plat</th><th>Model</th><th>DS</th><th>Pemegang</th><th>Status</th><th>Servis berikutnya</th><th /></tr></thead>
+            <thead><tr>{kelola && <th className="w-8"><input type="checkbox" aria-label="Pilih semua molis yang tampil" checked={semua} onChange={() => setDipilih(semua ? new Set() : new Set(tampil.map((m) => m.id)))} /></th>}<th>Kode</th><th>Plat</th><th>Model</th><th>DS</th><th>Pemegang</th><th>Status</th><th>Servis berikutnya</th><th /></tr></thead>
             <tbody>
               {pg.rows.map((m) => (
                 <tr key={m.id} className={m.id === pilih ? 'bg-primary-soft/60' : ''}>
+                  {kelola && <td><input type="checkbox" aria-label={`Pilih ${m.kode_motor}`} checked={dipilih.has(m.id)} onChange={() => centang(m.id)} /></td>}
                   <td className="font-mono font-medium">{m.kode_motor}</td>
                   <td>{m.plat_nomor ?? '–'}</td>
                   <td>{[m.merek, m.model, m.tahun].filter(Boolean).join(' ') || '–'}</td>
@@ -218,7 +239,7 @@ function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis
   m: Motor; me: Me; kelola: boolean; dsBoleh: Ds[]; dsNama: (id: string | null) => string; riders: Rider[]; riderNama: (id: string | null) => string
   servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; tutup: () => void; reload: () => void; modeAwal: 'servis' | null
 }) {
-  const [mode, setMode] = useState<null | 'edit' | 'servis' | 'lapor' | 'pindah'>(kelola ? modeAwal : null)
+  const [mode, setMode] = useState<null | 'edit' | 'servis' | 'lapor' | 'pindah' | 'mendesak'>(kelola ? modeAwal : null)
   const selesai = () => { setMode(null); reload() }
   const tombol = (k: NonNullable<typeof mode>, label: string) => (
     <button className={mode === k ? 'btn' : 'btn2'} onClick={() => setMode(mode === k ? null : k)}>{label}</button>
@@ -235,6 +256,7 @@ function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis
           {kelola && tombol('edit', 'Ubah data')}
           {kelola && tombol('servis', 'Catat servis')}
           {tombol('lapor', 'Lapor kerusakan')}
+          {tombol('mendesak', 'Ajukan servis mendesak')}
           {kelola && tombol('pindah', 'Pindah DS')}
           <button className="btn2" onClick={tutup}><X size={14} />Tutup</button>
         </div>
@@ -260,6 +282,7 @@ function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis
           {mode === 'servis' && <FormServis motorId={m.id} selesai={selesai} />}
           {mode === 'lapor' && <FormLapor motorId={m.id} me={me} selesai={selesai} />}
           {mode === 'pindah' && <FormPindah m={m} dsBoleh={dsBoleh.filter((d) => d.id !== m.ds_id)} selesai={selesai} />}
+          {mode === 'mendesak' && <FormMendesak m={m} selesai={selesai} />}
         </div>
       )}
 
@@ -277,6 +300,24 @@ function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis
           </section>
         )}
       </div>
+    </div>
+  )
+}
+
+// Servis mendesak: untuk motor yang memang butuh servis sekarang (bukan servis rutin). Masuk daftar "Molis diminta servis" dengan tanda URGENT.
+function FormMendesak({ m, selesai }: { m: Motor; selesai: () => void }) {
+  const [alasan, setAlasan] = useState('')
+  async function kirim() {
+    if (!alasan.trim()) return toast('Tulis alasan servis mendesak dulu.')
+    if (!(await ok(sb.rpc('ajukan_servis_mendesak', { p_motor: m.id, p_alasan: alasan.trim() })))) return
+    toast.ok(`Servis mendesak ${m.kode_motor} diajukan. Masuk daftar Molis diminta servis dengan tanda URGENT.`)
+    selesai()
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">Pakai ini hanya kalau molis butuh servis sekarang. Pengajuan akan tampil paling atas dengan tanda URGENT untuk Arcon dan Super-admin. Untuk kerusakan fisik (jatuh, patah) pakai Lapor kerusakan.</p>
+      <Field label="Alasan servis mendesak" hint="Apa masalahnya dan kenapa tidak bisa menunggu."><textarea className="inp w-full" rows={3} value={alasan} onChange={(e) => setAlasan(e.target.value)} /></Field>
+      <button className="btn" onClick={kirim}>Ajukan servis mendesak</button>
     </div>
   )
 }
