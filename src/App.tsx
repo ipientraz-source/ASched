@@ -20,19 +20,19 @@ const SUPER: Tab[] = [
   { nama: 'Data Rider', desc: 'Atur rider: pindahkan ke DS lain, ubah status aktif/nonaktif, import dan unduh CSV', Icon: Users, View: DataRider },
   { nama: 'Jadwal', desc: 'Lihat dan susun jadwal DS mana pun. Biasanya disusun Captain; Super-admin bisa membantu kapan saja.', Icon: CalendarDays, View: () => <JadwalSemua editable /> },
   { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS per minggu. Hanya Super-admin dan Arcon yang bisa melihatnya.', Icon: ListChecks, View: () => <DaftarJadwal /> },
-  { nama: 'Absensi Harian', desc: 'Isi atau koreksi absensi rider di DS mana pun', Icon: ClipboardCheck, View: () => <AbsensiSemua /> },
-  { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
+  { nama: 'Laporan Absensi Harian', desc: 'Isi atau koreksi absensi rider di DS mana pun', Icon: ClipboardCheck, View: () => <AbsensiSemua /> },
+  { nama: 'Rekap Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
   { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota rider, pilih Captain, dan tambah Super-admin', Icon: Building2, View: () => <Kelola /> },
   { nama: 'Armada', desc: 'Data motor listrik, servis rutin, dan laporan kerusakan di semua DS', Icon: Bike, View: Armada },
   { nama: 'Pengguna', desc: 'Semua pengguna menurut peran: Super-admin, Arcon, Captain, dan rider. Hanya Super-admin yang bisa mengubah status Arcon dan Captain.', Icon: UserCog, View: () => <Pengguna /> },
 ]
 const CAPTAIN: Tab[] = [
   { nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda sebagai rider', Icon: CalendarCheck, View: JadwalSaya },
-  { nama: 'Absensi Harian', desc: 'Tandai rider yang masuk dan tidak masuk hari ini', Icon: ClipboardCheck, View: Daily },
-  { nama: 'Jadwal DS Saya', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
-  { nama: 'Rekap DS Saya', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
+  { nama: 'Laporan Absensi Harian', desc: 'Tandai rider yang masuk dan tidak masuk hari ini', Icon: ClipboardCheck, View: Daily },
+  { nama: 'Jadwal DS', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
+  { nama: 'Rekap Kehadiran', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
   { nama: 'Armada', desc: 'Lihat motor listrik di DS Anda dan laporkan kerusakan', Icon: Bike, View: Armada },
-  { nama: 'Rider DS Saya', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
+  { nama: 'Rider DS', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
 ]
 // Arcon: atasan Captain, memantau beberapa DS. Hanya melihat — jadwal dan absensi tetap dikerjakan Captain.
 const ARCON: Tab[] = [
@@ -41,7 +41,7 @@ const ARCON: Tab[] = [
   { nama: 'Jadwal', desc: 'Lihat jadwal DS yang Anda pegang. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: ({ dsList }) => <JadwalSemua daftar={dsList} /> },
   { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS yang Anda pegang, per minggu', Icon: ListChecks, View: () => <DaftarJadwal /> },
   { nama: 'Armada', desc: 'Kelola motor listrik, servis rutin, dan kerusakan di DS yang Anda pegang', Icon: Bike, View: Armada },
-  { nama: 'Laporan Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya dan kunci absensi mingguan di DS Anda', Icon: ClipboardList, View: Rekap },
+  { nama: 'Rekap Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya dan kunci absensi mingguan di DS Anda', Icon: ClipboardList, View: Rekap },
 ]
 const RIDER: Tab[] = [{ nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda', Icon: CalendarCheck, View: JadwalSaya }]
 
@@ -130,7 +130,7 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
         <form onSubmit={submit} className="w-full max-w-sm">
           <div className="md:hidden flex items-center gap-3 mb-8">
             <Logo />
-            <div className="font-display font-bold text-xl">Dash ORCA</div>
+            <div className="font-brand text-xl leading-none"><span className="font-medium">DASH </span><span className="font-extrabold text-primary">ORCA</span></div>
           </div>
           <h1 className="text-2xl font-bold mb-1">Masuk</h1>
           <p className="text-sm text-muted-foreground mb-6">Pilih cara masuk sesuai peran Anda.</p>
@@ -204,7 +204,7 @@ function LupaPassword({ emailAwal, balik }: { emailAwal: string; balik: () => vo
     <form onSubmit={kirim} className="w-full max-w-sm">
       <div className="md:hidden flex items-center gap-3 mb-8">
         <Logo />
-        <div className="font-display font-bold text-xl">Dash ORCA</div>
+        <div className="font-brand text-xl leading-none"><span className="font-medium">DASH </span><span className="font-extrabold text-primary">ORCA</span></div>
       </div>
       <h1 className="text-2xl font-bold mb-1">Lupa password</h1>
       <p className="text-sm text-muted-foreground mb-6">Masukkan email akun Anda. Kami kirim tautan untuk membuat password baru. Cara ini juga dipakai untuk membuat password pertama kali.</p>
@@ -256,7 +256,7 @@ function PasswordBaru({ selesai }: { selesai: () => void }) {
       <form onSubmit={simpan} className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8">
           <Logo />
-          <div className="font-display font-bold text-xl">Dash ORCA</div>
+          <div className="font-brand text-xl leading-none"><span className="font-medium">DASH </span><span className="font-extrabold text-primary">ORCA</span></div>
         </div>
         <h1 className="text-2xl font-bold mb-1">Buat password baru</h1>
         <p className="text-sm text-muted-foreground mb-6">Pilih password yang mudah Anda ingat tapi sulit ditebak. Minimal 8 karakter.</p>
@@ -317,8 +317,8 @@ function AdminApp({ email }: { email: string }) {
         <div className="flex items-center gap-3 px-2 mb-8 mt-1">
           <Logo small />
           <div>
-            <div className="font-display font-bold text-white leading-none">Dash</div>
-            <div className="font-mono text-[10px] tracking-widest uppercase mt-1">ORCA</div>
+            <div className="font-brand text-lg leading-none text-white"><span className="font-medium">DASH </span><span className="font-extrabold">ORCA</span></div>
+            <div className="text-[10px] tracking-wide mt-1.5 text-white/50">Orbit &amp; Cadence</div>
           </div>
         </div>
         <nav className="space-y-1 flex-1">

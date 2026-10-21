@@ -76,7 +76,7 @@ export function Kelola() {
 
       <div className="mb-3 mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
         <h2 className="mr-2 text-lg font-bold">Daftar DS</h2>
-        <div className="relative">
+        <div className="relative max-w-full">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input className="inp w-72 max-w-full !pl-9" placeholder="Cari DS atau nama Captain…" aria-label="Cari DS" value={cari} onChange={(e) => setCari(e.target.value)} />
         </div>
