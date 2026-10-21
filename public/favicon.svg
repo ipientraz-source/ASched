@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="13 13 180 180" aria-label="Dash ORCA">
+  <rect x="18" y="18" width="170" height="170" rx="40" fill="#0f1b33" stroke="#4cd9e8" stroke-width="5"/>
+  <g transform="translate(100,103) rotate(-20)">
+    <path d="M56 -8 L90 2 L56 12 Z" fill="#fff"/>
+    <ellipse rx="72" ry="56" fill="#fff"/>
+    <path d="M56 -8 L86 2 L56 12 Z" fill="#111"/>
+    <ellipse rx="66" ry="50" fill="#111"/>
+    <ellipse rx="45" ry="33" fill="#4cd9e8"/>
+    <circle r="10" fill="#111"/>
+  </g>
+</svg>
