@@ -475,7 +475,7 @@ export const Field = ({ label, hint, children, className = '' }: { label: string
 )
 
 export const Logo = ({ small }: { small?: boolean }) => (
-  <img src="/logo.png" alt="Dash ORCA" className={`${small ? 'size-9' : 'size-12'} shrink-0 drop-shadow-md`} />
+  <img src="/logo.png" alt="Dash ORCA" className={`${small ? 'size-9' : 'size-12'} shrink-0 rounded-xl shadow-lg shadow-black/20`} />
 )
 
 export const Kosong = ({ teks, hint }: { teks: string; hint?: string }) => (
