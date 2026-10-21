@@ -29,10 +29,10 @@ const SUPER: Tab[] = [
 const CAPTAIN: Tab[] = [
   { nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda sebagai rider', Icon: CalendarCheck, View: JadwalSaya },
   { nama: 'Laporan Absensi Harian', desc: 'Tandai rider yang masuk dan tidak masuk hari ini', Icon: ClipboardCheck, View: Daily },
-  { nama: 'Jadwal DS Saya', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
-  { nama: 'Rekap DS Saya', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
+  { nama: 'Jadwal DS', desc: 'Susun jadwal rider di DS Anda per minggu', Icon: CalendarDays, View: JadwalDs },
+  { nama: 'Rekap Kehadiran', desc: 'Rekap kehadiran, alpha, dan pengganti di DS Anda', Icon: TrendingUp, View: Rekap },
   { nama: 'Armada', desc: 'Lihat motor listrik di DS Anda dan laporkan kerusakan', Icon: Bike, View: Armada },
-  { nama: 'Rider DS Saya', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
+  { nama: 'Rider DS', desc: 'Kelola rider DS Anda dan tarik rider dari DS lain', Icon: Users, View: DataRider },
 ]
 // Arcon: atasan Captain, memantau beberapa DS. Hanya melihat — jadwal dan absensi tetap dikerjakan Captain.
 const ARCON: Tab[] = [

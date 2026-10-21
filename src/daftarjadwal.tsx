@@ -1,5 +1,5 @@
 // Daftar Jadwal: jadwal tersimpan semua DS, satu baris per DS per minggu. Hanya Super-admin dan Arcon
-// (Arcon otomatis hanya melihat DS yang dipegang: dibatasi di database). Captain memakai tab Jadwal DS Saya.
+// (Arcon otomatis hanya melihat DS yang dipegang: dibatasi di database). Captain memakai tab Jadwal DS.
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { sb, useRows, today, addDays, monday, Err, Kosong, Select, usePage, Pagination, type Ds } from './lib'

@@ -132,7 +132,7 @@ function DailyInner({ ds }: { ds: Ds }) {
             hapus={hapus}
           />
         ))}
-        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider yang dijadwalkan di tanggal ini" hint="Susun jadwal di tab Jadwal DS Saya, atau tambahkan rider pengganti di bawah." /></div>}
+        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider yang dijadwalkan di tanggal ini" hint="Susun jadwal di tab Jadwal DS, atau tambahkan rider pengganti di bawah." /></div>}
       </div>
       <div className="mt-3"><Pagination {...pg} /></div>
       <TambahPengganti
