@@ -20,6 +20,16 @@ export type Rusak = {
 }
 export type Pindah = { id: string; motor_id: string; dari_ds: string | null; ke_ds: string | null; alasan: string; waktu: string }
 
+export type Permintaan = {
+  id: string; judul: string; jenis: string; tenggat: string | null; catatan: string | null; status: 'berjalan' | 'selesai'
+  dibuat_oleh: string | null; dibuat: string; ditutup: string | null
+}
+export type ItemServis = {
+  id: string; permintaan_id: string; motor_id: string; status: 'diminta' | 'dijadwalkan' | 'selesai' | 'dilewati'
+  tanggal_jadwal: string | null; servis_id: string | null; selesai_pada: string | null; catatan: string | null
+}
+export type RingkasanPermintaan = { permintaan_id: string; total: number; selesai: number; dilewati: number; menunggu: number }
+
 export const JENIS_SERVIS = ['Servis rutin', 'Ganti baterai', 'Ganti ban', 'Ganti rem', 'Cek kelistrikan', 'Lainnya']
 export const JENIS_RUSAK = ['Ban bocor / pecah', 'Rem', 'Baterai', 'Charger / konektor', 'Motor penggerak (hub)', 'Kontroler', 'Lampu / kelistrikan', 'Bodi / jatuh / tabrakan', 'Spion', 'Kunci / kontak', 'Suspensi', 'Lainnya']
 export const MAKS_FOTO = 4
@@ -38,6 +48,22 @@ export const BadgeRusak = ({ s }: { s: Rusak['status'] }) => <span className={`b
 export const BadgeParah = ({ s }: { s: Rusak['keparahan'] }) => (
   <span className={`badge capitalize ${s === 'berat' ? 'bg-danger-soft text-danger' : s === 'sedang' ? 'bg-warning-soft text-warning' : 'bg-muted text-foreground/80'}`}>{s}</span>
 )
+
+const GAYA_ITEM = { diminta: 'bg-warning-soft text-warning', dijadwalkan: 'bg-primary-soft text-primary-soft-foreground', selesai: 'bg-success-soft text-success', dilewati: 'bg-muted text-foreground/80' }
+export const BadgeItem = ({ s }: { s: ItemServis['status'] }) => <span className={`badge capitalize ${GAYA_ITEM[s]}`}>{s}</span>
+
+// Tenggat pengajuan: lewat = merah, 3 hari ke depan = kuning
+export function Tenggat({ d }: { d: string | null }) {
+  if (!d) return <span className="text-muted-foreground">Tanpa tenggat</span>
+  const sisa = selisihHari(d, today())
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {tgl(d)}
+      {sisa < 0 && <span className="badge bg-danger-soft text-danger">Lewat {-sisa} hari</span>}
+      {sisa >= 0 && sisa <= 3 && <span className="badge bg-warning-soft text-warning">{sisa === 0 ? 'Hari ini' : `${sisa} hari lagi`}</span>}
+    </span>
+  )
+}
 
 // Jadwal servis berikutnya: terlambat = merah, 7 hari ke depan = kuning
 export function ServisBerikutnya({ m }: { m: Motor }) {

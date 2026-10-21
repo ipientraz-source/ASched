@@ -1,9 +1,10 @@
 // Armada (Fleet management): data EV, servis rutin, laporan kerusakan, pindah DS.
 // Super-admin kelola semua; Arcon kelola penuh di DS yang dipegang; Captain melihat motor DS-nya dan melaporkan kerusakan.
 import { useState } from 'react'
-import { AlertTriangle, Bike, Wrench, Warehouse, X } from 'lucide-react'
+import { AlertTriangle, Bike, ClipboardList, Wrench, Warehouse, X } from 'lucide-react'
 import { sb, today, useRows, ok, toast, konfirmasi, Err, Field, Select, Stat, Kosong, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
-import { angka, BadgeStatus, rupiah, ServisBerikutnya, tgl, type Motor, type Pindah, type Rusak, type Servis } from './armada-lib'
+import { angka, BadgeStatus, rupiah, ServisBerikutnya, tgl, type ItemServis, type Motor, type Permintaan, type Pindah, type RingkasanPermintaan, type Rusak, type Servis } from './armada-lib'
+import { BagianDiminta } from './armada-diminta'
 import { FormLapor, FormServis, ListRusak, namaPelapor, TabelServis } from './armada-catatan'
 
 const STATUS = [{ value: '', label: 'Semua status' }, { value: 'dipakai', label: 'Dipakai' }, { value: 'di gudang', label: 'Di gudang' }, { value: 'perbaikan', label: 'Perbaikan' }]
@@ -16,10 +17,16 @@ export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[]
   const srv = useRows<Servis>(() => sb.from('servis_motor').select('*').order('tanggal', { ascending: false }).limit(1000), [])
   const rsk = useRows<Rusak>(() => sb.from('kerusakan_motor').select('*').order('tanggal', { ascending: false }).limit(1000), [])
   const pnd = useRows<Pindah>(() => sb.from('perpindahan_motor').select('*').order('waktu', { ascending: false }).limit(500), [])
-  const [bagian, setBagian] = useState<'motor' | 'servis' | 'kerusakan'>('motor')
+  const pmt = useRows<Permintaan>(() => sb.from('permintaan_servis').select('*').order('dibuat', { ascending: false }).limit(500), [])
+  const rng = useRows<RingkasanPermintaan>(() => sb.rpc('ringkasan_permintaan'), [])
+  const itb = useRows<ItemServis>(() => sb.from('permintaan_servis_item').select('*').in('status', ['diminta', 'dijadwalkan']).limit(1000), [])
+  const [bagian, setBagian] = useState<'motor' | 'diminta' | 'servis' | 'kerusakan'>('motor')
   const [pilih, setPilih] = useState<string | null>(null)
+  const [modeAwal, setModeAwal] = useState<'servis' | null>(null) // dari "Catat servis" di daftar menunggu servis
   const [fds, setFds] = useState('')
-  const reloadSemua = () => { mts.reload(); srv.reload(); rsk.reload(); pnd.reload() }
+  const reloadSemua = () => { mts.reload(); srv.reload(); rsk.reload(); pnd.reload(); pmt.reload(); rng.reload(); itb.reload() }
+  const pilihMotor = (id: string | null) => { setModeAwal(null); setPilih(id) }
+  const bukaServis = (id: string) => { setModeAwal('servis'); setPilih(id); setBagian('motor') }
 
   // DS yang boleh dipakai untuk menambah/memindah motor
   const dsBoleh = me.peran === 'super_admin' ? dsl.rows : me.peran === 'arcon' ? dsList : ds ? [ds] : []
@@ -37,17 +44,20 @@ export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[]
   return (
     <div>
       <Err msg={mts.err || srv.err || rsk.err || dsl.err || rid.err || pnd.err} />
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Stat icon={Bike} label="Total motor" value={mts.rows.length} />
         <Stat icon={Bike} label="Sedang dipakai" value={jml('dipakai')} tone="zinc" />
         <Stat icon={Warehouse} label="Di gudang" value={jml('di gudang')} tone="zinc" />
+        <Stat icon={ClipboardList} label="Menunggu servis" value={itb.rows.length} tone={itb.rows.length ? 'red' : 'zinc'} />
         <Stat icon={Wrench} label="Servis terlambat" value={terlambat} tone={terlambat ? 'red' : 'zinc'} />
         <Stat icon={AlertTriangle} label="Laporan terbuka" value={terbuka} tone={terbuka ? 'red' : 'zinc'} />
       </div>
 
       <div className="mb-4 flex flex-wrap gap-1.5">
-        {([['motor', 'Motor'], ['servis', 'Riwayat servis'], ['kerusakan', 'Kerusakan']] as const).map(([k, l]) => (
-          <button key={k} type="button" className={`tab ${bagian === k ? 'tab-on' : ''}`} onClick={() => setBagian(k)}>{l}{k === 'kerusakan' && terbuka > 0 ? ` (${terbuka})` : ''}</button>
+        {([['motor', 'Data Molis'], ['diminta', 'Molis diminta servis'], ['servis', 'Riwayat servis'], ['kerusakan', 'Kerusakan']] as const).map(([k, l]) => (
+          <button key={k} type="button" className={`tab ${bagian === k ? 'tab-on' : ''}`} onClick={() => setBagian(k)}>
+            {l}{k === 'kerusakan' && terbuka > 0 ? ` (${terbuka})` : ''}{k === 'diminta' && itb.rows.length > 0 ? ` (${itb.rows.length})` : ''}
+          </button>
         ))}
         {dsBoleh.length > 1 && (
           <Select className="ml-auto w-56" value={fds} onChange={setFds} opsi={[{ value: '', label: 'Semua DS' }, ...dsBoleh.map((d) => ({ value: d.id, label: d.nama }))]} />
@@ -56,8 +66,14 @@ export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[]
 
       {bagian === 'motor' && (
         <BagianMotor
-          motors={mts.rows.filter((m) => !fds || m.ds_id === fds)} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={rid.rows} pilih={pilih} setPilih={setPilih} detail={detail}
-          servis={srv.rows} rusak={rsk.rows} pindah={pnd.rows} pelapor={pelapor} reload={reloadSemua}
+          motors={mts.rows.filter((m) => !fds || m.ds_id === fds)} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={rid.rows} pilih={pilih} setPilih={pilihMotor} detail={detail}
+          servis={srv.rows} rusak={rsk.rows} pindah={pnd.rows} pelapor={pelapor} reload={reloadSemua} modeAwal={modeAwal} diminta={new Set(itb.rows.map((i) => i.motor_id))}
+        />
+      )}
+      {bagian === 'diminta' && (
+        <BagianDiminta
+          permintaan={pmt.rows} ringkasan={rng.rows} terbuka={itb.rows.filter((i) => !fds || dsMotor(i.motor_id) === fds)} motors={mts.rows.filter((m) => !fds || m.ds_id === fds)}
+          dsNama={dsNama} dsBoleh={dsBoleh} kelola={kelola} bukaServis={bukaServis} reload={reloadSemua}
         />
       )}
       {bagian === 'servis' && <BagianServis rows={srv.rows.filter((s) => !fds || dsMotor(s.motor_id) === fds)} motorKode={motorKode} />}
@@ -69,9 +85,9 @@ export function Armada({ me, ds, dsList }: { me: Me; ds: Ds | null; dsList: Ds[]
 }
 
 // ───────── Motor ─────────
-function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPilih, detail, servis, rusak, pindah, pelapor, reload }: {
+function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPilih, detail, servis, rusak, pindah, pelapor, reload, modeAwal, diminta }: {
   motors: Motor[]; me: Me; kelola: boolean; dsBoleh: Ds[]; dsNama: (id: string | null) => string; riders: Rider[]; pilih: string | null; setPilih: (id: string | null) => void
-  detail: Motor | null; servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; reload: () => void
+  detail: Motor | null; servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; reload: () => void; modeAwal: 'servis' | null; diminta: Set<string>
 }) {
   const [q, setQ] = useState('')
   const [fst, setFst] = useState('')
@@ -90,7 +106,7 @@ function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPi
       )}
       {detail && (
         <DetailMotor
-          key={detail.id} m={detail} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={riders} riderNama={riderNama}
+          key={detail.id + (modeAwal ?? '')} modeAwal={modeAwal} m={detail} me={me} kelola={kelola} dsBoleh={dsBoleh} dsNama={dsNama} riders={riders} riderNama={riderNama}
           servis={servis.filter((s) => s.motor_id === detail.id)} rusak={rusak.filter((r) => r.motor_id === detail.id)} pindah={pindah.filter((p) => p.motor_id === detail.id)}
           pelapor={pelapor} tutup={() => setPilih(null)} reload={reload}
         />
@@ -115,7 +131,10 @@ function BagianMotor({ motors, me, kelola, dsBoleh, dsNama, riders, pilih, setPi
                   <td>{[m.merek, m.model, m.tahun].filter(Boolean).join(' ') || '–'}</td>
                   <td>{dsNama(m.ds_id)}</td>
                   <td>{riderNama(m.dipegang_oleh)}</td>
-                  <td><BadgeStatus s={m.status} /></td>
+                  <td>
+                    <BadgeStatus s={m.status} />
+                    {diminta.has(m.id) && <span className="badge ml-1.5 bg-warning-soft text-warning">Diminta servis</span>}
+                  </td>
                   <td><ServisBerikutnya m={m} /></td>
                   <td className="text-right"><button className="btn2" onClick={() => setPilih(m.id === pilih ? null : m.id)}>{m.id === pilih ? 'Tutup' : 'Detail'}</button></td>
                 </tr>
@@ -195,11 +214,11 @@ function Info({ l, v }: { l: string; v: React.ReactNode }) {
   )
 }
 
-function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis, rusak, pindah, pelapor, tutup, reload }: {
+function DetailMotor({ m, me, kelola, dsBoleh, dsNama, riders, riderNama, servis, rusak, pindah, pelapor, tutup, reload, modeAwal }: {
   m: Motor; me: Me; kelola: boolean; dsBoleh: Ds[]; dsNama: (id: string | null) => string; riders: Rider[]; riderNama: (id: string | null) => string
-  servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; tutup: () => void; reload: () => void
+  servis: Servis[]; rusak: Rusak[]; pindah: Pindah[]; pelapor: (id: string | null) => string; tutup: () => void; reload: () => void; modeAwal: 'servis' | null
 }) {
-  const [mode, setMode] = useState<null | 'edit' | 'servis' | 'lapor' | 'pindah'>(null)
+  const [mode, setMode] = useState<null | 'edit' | 'servis' | 'lapor' | 'pindah'>(kelola ? modeAwal : null)
   const selesai = () => { setMode(null); reload() }
   const tombol = (k: NonNullable<typeof mode>, label: string) => (
     <button className={mode === k ? 'btn' : 'btn2'} onClick={() => setMode(mode === k ? null : k)}>{label}</button>

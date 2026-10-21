@@ -175,6 +175,69 @@ test('Pindah DS: hanya Super-admin atau Arcon yang memegang DS asal dan tujuan, 
   })
 })
 
+test('Pengajuan servis: dibuat Super-admin/Arcon untuk semua motor di cakupan, selesai otomatis saat servis dicatat, jadi riwayat', async () => {
+  const hari = await hariIni()
+  const buat = (judul, jenis = 'Servis rutin', tenggat = null, ds = null) =>
+    q('select buat_permintaan_servis($1, $2, $3::date, null, $4::uuid) id', [judul, jenis, tenggat, ds]).then((r) => r[0].id)
+  const item = (pid) => q('select m.kode_motor, i.status, i.servis_id, i.selesai_pada::text sp from permintaan_servis_item i join motor m on m.id = i.motor_id where i.permintaan_id = $1 order by m.kode_motor', [pid])
+  const statusReq = async (pid) => (await q('select status from permintaan_servis where id = $1', [pid]))[0].status
+  const M4 = (await q("select id from motor where kode_motor = 'EV-004'"))[0].id
+  let pid
+  await as(CG, async () => await assert.rejects(buat('x'), /Hanya Super-admin atau Arcon/))
+  await as(AB, async () => await assert.rejects(buat('Servis Oktober'), /Tidak ada motor/)) // Gowa tidak punya motor lagi
+  await as(AA, async () => {
+    await assert.rejects(buat('  '), /Judul pengajuan wajib/)
+    await assert.rejects(buat('x', 'Servis rutin', '2000-01-01'), /masa lalu/)
+    await assert.rejects(buat('x', 'Servis rutin', null, GOWA), /bukan milik Anda/)
+    pid = await buat('Servis rutin Oktober', 'Servis rutin', hari)
+    assert.deepEqual((await item(pid)).map((x) => [x.kode_motor, x.status]), [['EV-001', 'diminta'], ['EV-002', 'diminta'], ['EV-003', 'diminta'], ['EV-004', 'diminta']])
+    assert.equal(await statusReq(pid), 'berjalan')
+    const rs = (await q('select total, selesai, dilewati, menunggu from ringkasan_permintaan() where permintaan_id = $1', [pid]))[0]
+    assert.deepEqual([rs.total, rs.selesai, rs.dilewati, rs.menunggu], [4, 0, 0, 4])
+  })
+  // siapa melihat: Captain hanya motor DS-nya, Arcon Gowa tidak melihat apa pun
+  await as(CG, async () => {
+    assert.deepEqual((await item(pid)).map((x) => x.kode_motor), ['EV-003', 'EV-004'])
+    assert.equal((await q('select * from permintaan_servis')).length, 1)
+    assert.equal((await q("update permintaan_servis_item set status = 'selesai' where permintaan_id = $1 returning id", [pid])).length, 0) // Captain tak bisa mengubah
+  })
+  await as(CA, async () => assert.deepEqual((await item(pid)).map((x) => x.kode_motor), ['EV-001', 'EV-002']))
+  await as(AB, async () => assert.equal((await q('select * from permintaan_servis')).length, 0))
+  await as(AA, async () => {
+    // servis jenis lain tidak menyelesaikan; servis rutin menyelesaikan dan menautkan
+    await q("insert into servis_motor (motor_id, tanggal, jenis) values ($1, $2, 'Ganti ban')", [M3, hari])
+    assert.equal((await item(pid))[2].status, 'diminta')
+    await q("insert into servis_motor (motor_id, tanggal, jenis, bengkel) values ($1, $2, 'Servis rutin', 'Bengkel A')", [M3, hari])
+    const i3 = (await item(pid))[2]
+    assert.deepEqual([i3.status, i3.sp], ['selesai', hari])
+    assert.ok(i3.servis_id)
+    // dilewati wajib alasan, dijadwalkan wajib tanggal, motor tidak bisa diganti
+    await assert.rejects(q("update permintaan_servis_item set status = 'dilewati' where permintaan_id = $1 and motor_id = $2", [pid, M4]), /check constraint/)
+    await assert.rejects(q("update permintaan_servis_item set status = 'dijadwalkan' where permintaan_id = $1 and motor_id = $2", [pid, M4]), /check constraint/)
+    await q("update permintaan_servis_item set status = 'dijadwalkan', tanggal_jadwal = $3 where permintaan_id = $1 and motor_id = $2", [pid, M4, hari])
+    await assert.rejects(q('update permintaan_servis_item set motor_id = $2 where permintaan_id = $1 and motor_id = $3', [pid, M3, M4]), /tidak bisa diganti/)
+    assert.equal(await statusReq(pid), 'berjalan') // masih ada yang menunggu
+    // sisa motor diservis → pengajuan selesai otomatis dan tersimpan sebagai riwayat
+    for (const m of [M1, M2, M4]) await q("insert into servis_motor (motor_id, tanggal, jenis) values ($1, $2, 'Servis rutin')", [m, hari])
+    assert.ok((await item(pid)).every((x) => x.status === 'selesai'))
+    const h = (await q('select status, ditutup is not null tutup from permintaan_servis where id = $1', [pid]))[0]
+    assert.deepEqual([h.status, h.tutup], ['selesai', true])
+    // pengajuan per DS; item dilewati ikut menutup; dibuka lagi → berjalan
+    const p2 = await buat('Servis rutin November', 'Servis rutin', null, GALAXY)
+    assert.equal((await item(p2)).length, 2)
+    await q("update permintaan_servis_item set status = 'dilewati', catatan = 'motor dijual' where permintaan_id = $1", [p2])
+    assert.equal(await statusReq(p2), 'selesai')
+    await q("update permintaan_servis_item set status = 'diminta' where permintaan_id = $1 and motor_id = $2", [p2, M3])
+    assert.equal(await statusReq(p2), 'berjalan')
+  })
+  await as(S, async () => {
+    const semua = await buat('Servis semua motor')
+    assert.equal((await item(semua)).length, 4) // Super-admin: semua DS
+    await assert.rejects(buat('x', 'Servis rutin', null, GOWA), /Tidak ada motor/)
+    assert.equal((await q('select * from permintaan_servis')).length, 3)
+  })
+})
+
 test('Foto di Storage: nama berkas {motor_id}/..., akses mengikuti hak lihat motor, hapus hanya Super-admin dan Arcon', async () => {
   const boleh = (nama, hapus) => q('select armada_boleh($1, $2) b', [nama, hapus]).then((r) => r[0].b)
   await as(CA, async () => {
