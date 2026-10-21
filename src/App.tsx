@@ -313,7 +313,7 @@ function AdminApp({ email }: { email: string }) {
 
   return (
     <div className="min-h-screen md:flex">
-      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground p-4 sticky top-0 h-screen">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col sidebar-bg text-sidebar-foreground p-4 sticky top-0 h-screen overflow-hidden">
         <div className="flex items-center gap-3 px-2 mb-8 mt-1">
           <Logo small />
           <div>
@@ -321,7 +321,8 @@ function AdminApp({ email }: { email: string }) {
             <div className="text-[10px] tracking-wide mt-1.5 text-white/50">Orbit &amp; Cadence</div>
           </div>
         </div>
-        <nav className="space-y-1 flex-1">
+        <div className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/30">Menu</div>
+        <nav className="space-y-1 flex-1 overflow-y-auto">
           {tabs.map((t, i) => (
             <button key={t.nama} onClick={() => setTab(i)} className={`nav ${i === tab ? 'nav-on' : ''}`}>
               <t.Icon size={18} />
@@ -329,13 +330,13 @@ function AdminApp({ email }: { email: string }) {
             </button>
           ))}
         </nav>
-        <div className="border-t border-white/10 pt-4 flex items-center gap-3">
+        <div className="mt-3 rounded-2xl bg-white/[0.05] ring-1 ring-white/10 p-2.5 flex items-center gap-2">
           <div className="size-9 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center">{initials(me.nama)}</div>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="text-sm font-semibold text-white truncate">{me.nama}</div>
             <div className="font-mono text-[10px] uppercase tracking-wider truncate">{peran}{lokasi ? ` · ${lokasi}` : ''}</div>
           </div>
-          <TemaToggle className="hover:!bg-white/10 hover:text-white" />
+          <TemaToggle className="hover:!bg-white/10 hover:text-white !p-1.5" />
           <button onClick={() => sb.auth.signOut()} title="Keluar" className="p-2 rounded-md hover:bg-white/10 hover:text-white"><LogOut size={16} /></button>
         </div>
       </aside>
