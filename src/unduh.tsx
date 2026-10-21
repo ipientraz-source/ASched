@@ -121,7 +121,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
                   </div>
                 ))}
               </div>
-              <div className="mt-1.5 text-[11px] text-white/70">Dash Scheduler · Dicetak {dicetak}{halaman.length > 1 ? ` · Hal. ${hal + 1}/${halaman.length}` : ''}</div>
+              <div className="mt-1.5 text-[11px] text-white/70">Dash ORCA · Dicetak {dicetak}{halaman.length > 1 ? ` · Hal. ${hal + 1}/${halaman.length}` : ''}</div>
             </div>
           </div>
           <div className="mb-3 mt-4 flex items-center gap-5 text-xs text-muted-foreground">
@@ -200,7 +200,7 @@ export function Cetak({ data, mode, onSelesai }: { data: DataCetak; mode: 'png' 
             </tfoot>
           </table>
           </div>
-          <div className="mt-auto pt-3 text-[10px] text-muted-foreground">Dibuat dengan Dash Scheduler. Angka kuota: hijau berarti rider pas, kuning kurang, merah kelebihan.</div>
+          <div className="mt-auto pt-3 text-[10px] text-muted-foreground">Dibuat dengan Dash ORCA. Angka kuota: hijau berarti rider pas, kuning kurang, merah kelebihan.</div>
         </div>
       ))}
     </div>
