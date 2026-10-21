@@ -51,7 +51,7 @@ export function Kelola() {
       <div className="card">
         <b className="block mb-3">Buat DS baru</b>
         <div className="flex flex-wrap items-start gap-3">
-          <Field label="Nama DS" hint="Tulis persis seperti yang akan dipakai di file CSV rider, misalnya DS HAYAM WURUK." className="min-w-72 flex-1 max-w-md">
+          <Field label="Nama DS" hint="Tulis persis seperti yang akan dipakai di file CSV rider, misalnya DS HAYAM WURUK." className="min-w-[min(18rem,100%)] flex-1 max-w-md">
             <input className="inp w-full" placeholder="Contoh: DS HAYAM WURUK" value={nama} onChange={(e) => setNama(e.target.value)} />
           </Field>
           <div className="pt-5">

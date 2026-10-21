@@ -29,7 +29,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
         <Stat icon={Users} label="Total rider" value={orang.length} />
         <Stat icon={UserCheck} label="Rider aktif" value={aktif} tone="zinc" />
         <Stat icon={UserMinus} label="Belum punya DS" value={orang.filter((r) => !r.ds_id && r.peran === 'rider').length} tone="zinc" />
@@ -217,7 +217,7 @@ function ImportCsv({ done, dsl }: { done: () => void; dsl: Ds[] }) {
           Unduh template
         </button>
       </p>
-      <input type="file" accept=".csv,text/csv" disabled={busy} className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:border-foreground/50" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
+      <input type="file" accept=".csv,text/csv" disabled={busy} className="block max-w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-card file:px-3.5 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:border-foreground/50" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }} />
       {rows.length > 0 && (
         <div className="mt-4">
           {absensi && (

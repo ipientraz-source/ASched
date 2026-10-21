@@ -230,13 +230,13 @@ function AdminApp({ email }: { email: string }) {
           ))}
         </nav>
 
-        <header className="px-4 md:px-8 pt-6 pb-5 flex flex-wrap items-center gap-4 border-b border-border bg-card/80 backdrop-blur sticky top-0 z-10"><div className="size-12 rounded-2xl bg-primary-soft text-primary flex items-center justify-center"><cur.Icon size={24} /></div>
+        <header className="px-4 md:px-8 pt-4 pb-4 md:pt-6 md:pb-5 flex flex-wrap items-center gap-3 md:gap-4 border-b border-border bg-card/80 backdrop-blur md:sticky md:top-0 z-10"><div className="size-12 rounded-2xl bg-primary-soft text-primary flex items-center justify-center"><cur.Icon size={24} /></div>
           <div className="flex-1 min-w-60">
-            <h2 className="text-2xl font-bold">{cur.nama}</h2>
+            <h2 className="text-xl md:text-2xl font-bold">{cur.nama}</h2>
             <p className="text-sm text-muted-foreground mt-0.5">{cur.desc}</p>
           </div>
           <span className="hidden lg:inline font-mono text-xs text-muted-foreground bg-muted rounded-full px-3 py-1.5">{tgl}</span>
-          <TemaSwitch />
+          <div className="hidden md:block"><TemaSwitch /></div>
         </header>
         <main className="px-4 md:px-8 py-6 max-w-6xl">
           {me.peran === 'captain' && <Notif me={me} />}

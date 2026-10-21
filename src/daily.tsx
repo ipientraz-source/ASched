@@ -198,11 +198,11 @@ function Baris({
         {act?.potongan === false && <span className="badge bg-muted text-muted-foreground">Tanpa potongan</span>}
         {!!act?.insentif && <span className="badge bg-success-soft text-success">+ Insentif {rupiah(act.insentif)}</span>}
         {act?.penjelasan && <span className="text-xs text-muted-foreground">“{act.penjelasan}”</span>}
-        <div className="ml-auto flex gap-2">
-          <button className="btn btn-lg" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button className="btn btn-lg whitespace-nowrap" disabled={locked} onClick={() => catat(r.id, 'hadir')}>
             Hadir
           </button>
-          <button className="btn2 btn-lg" disabled={locked} onClick={() => setBuka(!buka)}>
+          <button className="btn2 btn-lg whitespace-nowrap" disabled={locked} onClick={() => setBuka(!buka)}>
             Tidak hadir
           </button>
           {act && (
