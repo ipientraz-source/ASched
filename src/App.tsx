@@ -121,7 +121,7 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
             })}
           </ul>
         </div>
-        <div className="relative font-mono text-[11px] uppercase tracking-widest text-white/60">Sistem internal · Dash Scheduler</div>
+        <div className="relative font-mono text-[11px] uppercase tracking-widest text-white/60">Sistem internal · Dash ORCA · Orbit &amp; Cadence</div>
       </div>
 
       <div className="relative flex items-center justify-center p-6 min-h-screen md:min-h-0">
@@ -130,7 +130,7 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
         <form onSubmit={submit} className="w-full max-w-sm">
           <div className="md:hidden flex items-center gap-3 mb-8">
             <Logo />
-            <div className="font-display font-bold text-xl">Dash Scheduler</div>
+            <div className="font-display font-bold text-xl">Dash ORCA</div>
           </div>
           <h1 className="text-2xl font-bold mb-1">Masuk</h1>
           <p className="text-sm text-muted-foreground mb-6">Pilih cara masuk sesuai peran Anda.</p>
@@ -204,7 +204,7 @@ function LupaPassword({ emailAwal, balik }: { emailAwal: string; balik: () => vo
     <form onSubmit={kirim} className="w-full max-w-sm">
       <div className="md:hidden flex items-center gap-3 mb-8">
         <Logo />
-        <div className="font-display font-bold text-xl">Dash Scheduler</div>
+        <div className="font-display font-bold text-xl">Dash ORCA</div>
       </div>
       <h1 className="text-2xl font-bold mb-1">Lupa password</h1>
       <p className="text-sm text-muted-foreground mb-6">Masukkan email akun Anda. Kami kirim tautan untuk membuat password baru. Cara ini juga dipakai untuk membuat password pertama kali.</p>
@@ -256,7 +256,7 @@ function PasswordBaru({ selesai }: { selesai: () => void }) {
       <form onSubmit={simpan} className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8">
           <Logo />
-          <div className="font-display font-bold text-xl">Dash Scheduler</div>
+          <div className="font-display font-bold text-xl">Dash ORCA</div>
         </div>
         <h1 className="text-2xl font-bold mb-1">Buat password baru</h1>
         <p className="text-sm text-muted-foreground mb-6">Pilih password yang mudah Anda ingat tapi sulit ditebak. Minimal 8 karakter.</p>
@@ -318,7 +318,7 @@ function AdminApp({ email }: { email: string }) {
           <Logo small />
           <div>
             <div className="font-display font-bold text-white leading-none">Dash</div>
-            <div className="font-mono text-[10px] tracking-widest uppercase mt-1">Scheduler</div>
+            <div className="font-mono text-[10px] tracking-widest uppercase mt-1">ORCA</div>
           </div>
         </div>
         <nav className="space-y-1 flex-1">
