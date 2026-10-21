@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { BellRing, Building2, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, ListChecks, LogOut, ShieldCheck, TrendingUp, UserCog, Users, type LucideIcon } from 'lucide-react'
-import { sb, store, useRows, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
+import { BellRing, Building2, Eye, EyeOff, CalendarCheck, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, ListChecks, LogOut, ShieldCheck, TrendingUp, UserCog, Users, type LucideIcon } from 'lucide-react'
+import { sb, store, useRows, toast, Err, Logo, TemaSwitch, TemaToggle, type Ds, type Me } from './lib'
 import { RiderApp, JadwalSaya } from './rider'
 import { AbsensiSemua, Daily } from './daily'
 import { JadwalDs, JadwalSemua } from './jadwal'
@@ -44,14 +44,19 @@ const RIDER: Tab[] = [{ nama: 'Jadwal Saya', desc: 'Jadwal kerja Anda', Icon: Ca
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [kode, setKode] = useState(() => store.get('kode') ?? '')
+  const [pemulihan, setPemulihan] = useState(false) // true saat pengguna membuka tautan reset password dari email
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = sb.auth.onAuthStateChange((_e, s) => setSession(s))
+    const { data } = sb.auth.onAuthStateChange((e, s) => {
+      setSession(s)
+      if (e === 'PASSWORD_RECOVERY') setPemulihan(true)
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 
   if (session === undefined) return <p className="p-6 text-muted-foreground">Memuat…</p>
+  if (session && pemulihan) return <PasswordBaru selesai={() => { setPemulihan(false); history.replaceState(null, '', location.pathname) }} />
   if (session) return <AdminApp email={session.user.email ?? ''} />
   if (kode) return <RiderApp kode={kode} out={() => { store.del('kode'); setKode('') }} />
   return <Login onKode={(k) => { store.set('kode', k); setKode(k) }} />
@@ -64,8 +69,10 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
   const [tab, setTab] = useState<'admin' | 'rider'>('admin')
   const [a, setA] = useState('')
   const [b, setB] = useState('')
-  const [err, setErr] = useState('')
+  // tautan reset yang kedaluwarsa dikembalikan Supabase lewat #error=... di alamat
+  const [err, setErr] = useState(() => (/error_code=otp_expired|error=access_denied/.test(location.hash) ? 'Tautan reset sudah kedaluwarsa atau tidak valid. Minta tautan baru lewat "Lupa password".' : ''))
   const [busy, setBusy] = useState(false)
+  const [lupa, setLupa] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -115,6 +122,7 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
 
       <div className="relative flex items-center justify-center p-6 min-h-screen md:min-h-0">
         <div className="absolute top-4 right-4"><TemaSwitch /></div>
+        {lupa ? <LupaPassword emailAwal={a} balik={() => setLupa(false)} /> : (
         <form onSubmit={submit} className="w-full max-w-sm">
           <div className="md:hidden flex items-center gap-3 mb-8">
             <Logo />
@@ -134,14 +142,128 @@ function Login({ onKode }: { onKode: (k: string) => void }) {
           {tab === 'admin' && (
             <>
               <label className="lbl">Password</label>
-              <input className="inp w-full mb-4 !py-2.5" type="password" value={b} onChange={(e) => setB(e.target.value)} />
+              <InputPassword value={b} onChange={setB} autoComplete="current-password" />
+              <div className="-mt-2 mb-4 text-right">
+                <button type="button" className="text-xs text-primary hover:underline" onClick={() => { setLupa(true); setErr('') }}>Lupa password / buat password?</button>
+              </div>
             </>
           )}
           <Err msg={err} />
           <button className="btn btn-lg w-full" disabled={busy || !a.trim() || (tab === 'admin' && !b)}>{busy ? 'Memproses…' : 'Masuk'}</button>
-          <p className="text-xs text-muted-foreground/70 mt-6 text-center">Akun Captain dibuat oleh Super-admin. Lupa password? Hubungi Super-admin.</p>
+          <p className="text-xs text-muted-foreground/70 mt-6 text-center">Akun Captain dan Arcon dibuat oleh Super-admin. Belum punya password atau lupa? Klik "Lupa password" di atas.</p>
         </form>
+        )}
       </div>
+    </div>
+  )
+}
+
+// Kolom password dengan tombol tampilkan / sembunyikan
+function InputPassword({ value, onChange, autoFocus, autoComplete }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; autoComplete?: string }) {
+  const [lihat, setLihat] = useState(false)
+  return (
+    <div className="relative mb-4">
+      <input className="inp w-full !py-2.5 !pr-11" type={lihat ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} autoFocus={autoFocus} autoComplete={autoComplete} />
+      <button type="button" onClick={() => setLihat(!lihat)} aria-label={lihat ? 'Sembunyikan password' : 'Tampilkan password'} title={lihat ? 'Sembunyikan password' : 'Tampilkan password'} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground">
+        {lihat ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  )
+}
+
+// Lupa password / buat password pertama kali: Supabase mengirim tautan ke email, tautan membuka layar PasswordBaru.
+// Tidak ada pengaturan password langsung dari halaman ini, jadi orang lain tidak bisa mengganti password hanya dengan tahu email.
+function LupaPassword({ emailAwal, balik }: { emailAwal: string; balik: () => void }) {
+  const [email, setEmail] = useState(emailAwal.includes('@') ? emailAwal : '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [terkirim, setTerkirim] = useState('')
+  const [tunggu, setTunggu] = useState(0) // jeda 60 detik sebelum boleh kirim ulang, supaya tidak menghabiskan jatah email
+  useEffect(() => {
+    if (tunggu <= 0) return
+    const t = setTimeout(() => setTunggu(tunggu - 1), 1000)
+    return () => clearTimeout(t)
+  }, [tunggu])
+
+  async function kirim(e: FormEvent) {
+    e.preventDefault()
+    setErr('')
+    setBusy(true)
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin })
+    setBusy(false)
+    if (error) return setErr(/rate limit|too many|seconds/i.test(error.message) ? 'Terlalu sering meminta tautan. Tunggu beberapa menit lalu coba lagi.' : 'Tautan belum bisa dikirim. Periksa email Anda lalu coba lagi.')
+    setTerkirim(email.trim())
+    setTunggu(60)
+  }
+
+  return (
+    <form onSubmit={kirim} className="w-full max-w-sm">
+      <div className="md:hidden flex items-center gap-3 mb-8">
+        <Logo />
+        <div className="font-display font-bold text-xl">Dash Scheduler</div>
+      </div>
+      <h1 className="text-2xl font-bold mb-1">Lupa password</h1>
+      <p className="text-sm text-muted-foreground mb-6">Masukkan email akun Anda. Kami kirim tautan untuk membuat password baru. Cara ini juga dipakai untuk membuat password pertama kali.</p>
+      {terkirim && (
+        <div className="mb-4 rounded-lg border border-primary/30 bg-primary-soft p-3 text-sm text-primary-soft-foreground">
+          Jika <b>{terkirim}</b> terdaftar, tautan sudah dikirim. Periksa kotak masuk dan folder spam, lalu buka tautannya.
+        </div>
+      )}
+      <label className="lbl">Email</label>
+      <input className="inp w-full mb-4 !py-2.5" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus placeholder="nama@dashelectric.co" />
+      <Err msg={err} />
+      <button className="btn btn-lg w-full" disabled={busy || !email.trim() || tunggu > 0}>
+        {busy ? 'Mengirim…' : tunggu > 0 ? `Kirim ulang dalam ${tunggu} detik` : terkirim ? 'Kirim ulang tautan' : 'Kirim tautan reset'}
+      </button>
+      <button type="button" onClick={balik} className="mt-3 w-full text-xs text-primary hover:underline">Kembali ke login</button>
+    </form>
+  )
+}
+
+// Layar setelah pengguna membuka tautan reset dari email: buat password baru
+function PasswordBaru({ selesai }: { selesai: () => void }) {
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const kurang = pw.length < 8 ? 'Password minimal 8 karakter' : pw !== pw2 ? 'Konfirmasi password belum sama' : ''
+
+  async function simpan(e: FormEvent) {
+    e.preventDefault()
+    if (kurang) return setErr(kurang)
+    setErr('')
+    setBusy(true)
+    const { error } = await sb.auth.updateUser({ password: pw })
+    setBusy(false)
+    if (error) {
+      return setErr(
+        /same|different from the old/i.test(error.message) ? 'Password baru tidak boleh sama dengan password lama.'
+        : /weak|short|characters/i.test(error.message) ? 'Password terlalu lemah. Pakai minimal 8 karakter, campur huruf dan angka.'
+        : 'Password belum bisa disimpan. Tautan mungkin sudah kedaluwarsa, minta tautan baru lewat Lupa password.',
+      )
+    }
+    toast.ok('Password baru tersimpan. Anda sudah masuk.')
+    selesai()
+  }
+
+  return (
+    <div className="relative flex min-h-screen items-center justify-center p-6">
+      <div className="absolute top-4 right-4"><TemaSwitch /></div>
+      <form onSubmit={simpan} className="w-full max-w-sm">
+        <div className="flex items-center gap-3 mb-8">
+          <Logo />
+          <div className="font-display font-bold text-xl">Dash Scheduler</div>
+        </div>
+        <h1 className="text-2xl font-bold mb-1">Buat password baru</h1>
+        <p className="text-sm text-muted-foreground mb-6">Pilih password yang mudah Anda ingat tapi sulit ditebak. Minimal 8 karakter.</p>
+        <label className="lbl">Password baru</label>
+        <InputPassword value={pw} onChange={setPw} autoFocus autoComplete="new-password" />
+        <label className="lbl">Ulangi password baru</label>
+        <InputPassword value={pw2} onChange={setPw2} autoComplete="new-password" />
+        <Err msg={err} />
+        <button className="btn btn-lg w-full" disabled={busy || !pw || !pw2}>{busy ? 'Menyimpan…' : 'Simpan password'}</button>
+        <button type="button" onClick={async () => { await sb.auth.signOut(); selesai() }} className="mt-3 w-full text-xs text-primary hover:underline">Batal dan kembali ke login</button>
+      </form>
     </div>
   )
 }
