@@ -50,8 +50,8 @@
   --warning: var(--amber-700);    --warning-soft: var(--amber-100);
   --success: var(--green-700);    --success-soft: var(--green-100);
 
-  --sidebar: var(--gray-950);
-  --sidebar-foreground: var(--gray-400);
+  --sidebar: #0b0d1c;
+  --sidebar-foreground: #a1a8c6;
 }
 
 .dark {
@@ -78,8 +78,8 @@
   --warning: var(--amber-400);    --warning-soft: #33250a;
   --success: var(--green-400);    --success-soft: #0f2a19;
 
-  --sidebar: #07070a;
-  --sidebar-foreground: var(--gray-400);
+  --sidebar: #090a17;
+  --sidebar-foreground: #a1a8c6;
 }
 
 /* "Pulau tema" untuk lembar cetak / unduhan gambar & PDF: selalu terang walau aplikasi sedang mode gelap.
@@ -176,8 +176,18 @@ h1, h2, h3 { font-family: var(--font-display); }
   .tbl tbody tr { @apply transition-colors; }
   .tbl tbody tr:hover { @apply bg-primary-soft/60; }
   .badge { @apply inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold; }
-  .nav { @apply w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left text-sidebar-foreground transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30; }
-  .nav-on { @apply bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary hover:text-primary-foreground; }
+  .sidebar-bg {
+    background:
+      radial-gradient(18rem 14rem at 0% 0%, color-mix(in srgb, var(--primary) 26%, transparent), transparent 70%),
+      radial-gradient(16rem 12rem at 100% 100%, color-mix(in srgb, #4cd9e8 9%, transparent), transparent 70%),
+      var(--sidebar);
+  }
+  .nav { @apply relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left text-sidebar-foreground transition-all duration-150 hover:bg-white/[0.07] hover:text-white hover:translate-x-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30; }
+  .nav svg { @apply shrink-0 opacity-70 transition-colors duration-150; }
+  .nav:hover svg { @apply opacity-100; }
+  .nav-on, .nav-on:hover { @apply text-white font-semibold translate-x-0; background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 42%, transparent), color-mix(in srgb, var(--primary) 10%, transparent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent); }
+  .nav-on svg { color: #c4b5fd; opacity: 1; }
+  .nav-on::before { content: ''; @apply absolute -left-4 top-2 bottom-2 w-1 rounded-r-full; background: linear-gradient(180deg, #c4b5fd, var(--primary)); }
   .tab { @apply px-3.5 py-1.5 text-sm font-semibold rounded-md text-muted-foreground transition-colors hover:bg-muted whitespace-nowrap; }
   .tab-on { @apply bg-primary text-primary-foreground hover:bg-primary; }
 }
