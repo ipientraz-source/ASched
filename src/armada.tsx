@@ -6,6 +6,7 @@ import { sb, today, useRows, ok, toast, konfirmasi, Err, Field, Select, Stat, Ko
 import { angka, BadgeStatus, rupiah, ServisBerikutnya, tgl, type ItemServis, type Motor, type Permintaan, type Pindah, type RingkasanPermintaan, type Rusak, type Servis } from './armada-lib'
 import { BagianDiminta, FormPengajuan } from './armada-diminta'
 import { ImporMotor } from './armada-impor'
+import { normPlat } from './impor'
 import { FormLapor, FormServis, ListRusak, namaPelapor, TabelServis } from './armada-catatan'
 
 const STATUS = [{ value: '', label: 'Semua status' }, { value: 'dipakai', label: 'Dipakai' }, { value: 'di gudang', label: 'Di gudang' }, { value: 'perbaikan', label: 'Perbaikan' }]
@@ -186,15 +187,19 @@ function FormMotor({ awal, dsBoleh, riders, selesai }: { awal?: Motor; dsBoleh: 
     berikut: awal?.servis_berikutnya ?? '', pemegang: awal?.dipegang_oleh ?? '', catatan: awal?.catatan ?? '',
   })
   const set = (k: keyof typeof f) => (v: string) => setF((s) => ({ ...s, [k]: v }))
+  // Tambah motor: cukup DS, plat nomor, dan nomor rangka; sisanya disembunyikan di "data tambahan". Ubah data: semua tampil.
+  const [lengkap, setLengkap] = useState(false)
   const kandidat = riders.filter((r) => r.peran === 'rider' && r.status === 'aktif' && r.ds_id === f.ds)
 
   async function simpan() {
-    if (!f.kode.trim()) return toast('Isi kode motor dulu.')
+    const kode = f.kode.trim() || (awal ? '' : normPlat(f.plat)) // kode kosong saat tambah = plat nomor
+    if (!kode) return toast(awal ? 'Isi kode motor dulu.' : 'Isi plat nomor dulu.')
+    if (!awal && !f.plat.trim()) return toast('Isi plat nomor dulu.')
     if (!awal && !f.ds) return toast('Pilih DS motor ini.')
     if (f.tahun && (angka(f.tahun) < 2000 || angka(f.tahun) > 2100)) return toast('Tahun tidak valid.')
     if (f.interval && (angka(f.interval) < 1 || angka(f.interval) > 730)) return toast('Interval servis 1 sampai 730 hari.')
     const isi = {
-      kode_motor: f.kode.trim(), plat_nomor: f.plat.trim() || null, merek: f.merek.trim() || null, model: f.model.trim() || null, tahun: f.tahun ? angka(f.tahun) : null,
+      kode_motor: kode, plat_nomor: f.plat.trim() || null, merek: f.merek.trim() || null, model: f.model.trim() || null, tahun: f.tahun ? angka(f.tahun) : null,
       warna: f.warna.trim() || null, no_rangka: f.rangka.trim() || null, no_mesin: f.mesin.trim() || null, tanggal_beli: f.beli || null,
       interval_servis_hari: f.interval ? angka(f.interval) : null, servis_berikutnya: f.berikut || null, dipegang_oleh: f.pemegang || null, catatan: f.catatan.trim() || null,
     }
@@ -204,31 +209,37 @@ function FormMotor({ awal, dsBoleh, riders, selesai }: { awal?: Motor; dsBoleh: 
     selesai()
   }
 
+  const sembunyi: string[] = awal || lengkap ? [] : ['kode', 'merek', 'model', 'tahun', 'warna', 'mesin', 'beli', 'interval', 'berikut']
   const input = (k: keyof typeof f, label: string, hint?: string, tipe = 'text') => (
-    <Field label={label} hint={hint}><input className="inp w-full" type={tipe} value={f[k]} onChange={(e) => set(k)(e.target.value)} /></Field>
+    <Field label={label} hint={hint} className={sembunyi.includes(k) ? 'hidden' : ''}><input className="inp w-full" type={tipe} value={f[k]} onChange={(e) => set(k)(e.target.value)} /></Field>
   )
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {input('kode', 'Kode motor', 'Nama unik motor ini, mis. EV-001.')}
+        {input('kode', 'Kode motor', awal ? 'Nama unik motor ini.' : 'Kosongkan untuk memakai plat nomor.')}
         <Field label="DS" hint={awal ? 'Untuk memindah DS pakai tombol Pindah DS.' : undefined}>
           <Select value={f.ds} onChange={(v) => setF((s) => ({ ...s, ds: v, pemegang: '' }))} disabled={!!awal} placeholder="— pilih DS —" opsi={dsBoleh.map((d) => ({ value: d.id, label: d.nama }))} />
         </Field>
         {input('plat', 'Plat nomor')}
-        <Field label="Rider pemegang" hint="Rider di DS yang sama. Kosong = motor di gudang.">
+        <Field label="Rider pemegang" hint="Rider di DS yang sama. Kosong = motor di gudang." className={awal || lengkap ? '' : 'hidden'}>
           <Select value={f.pemegang} onChange={set('pemegang')} cari opsi={[{ value: '', label: 'Tanpa pemegang' }, ...kandidat.map((r) => ({ value: r.id, label: `${r.nama} (${r.kode_mtr ?? '–'})` }))]} />
         </Field>
         {input('merek', 'Merek')}
         {input('model', 'Model')}
         {input('tahun', 'Tahun')}
         {input('warna', 'Warna')}
-        {input('rangka', 'Nomor rangka')}
+        {input('rangka', 'Nomor rangka (VIN)')}
         {input('mesin', 'Nomor mesin')}
         {input('beli', 'Tanggal beli', undefined, 'date')}
         {input('interval', 'Interval servis (hari)', 'Dipakai untuk menghitung servis berikutnya setelah Servis rutin dicatat.')}
         {input('berikut', 'Servis berikutnya', 'Isi tanggal servis berikutnya; bisa diubah kapan saja.', 'date')}
       </div>
-      <Field label="Catatan"><textarea className="inp w-full" rows={2} value={f.catatan} onChange={(e) => set('catatan')(e.target.value)} /></Field>
+      <Field label="Catatan" className={awal || lengkap ? '' : 'hidden'}><textarea className="inp w-full" rows={2} value={f.catatan} onChange={(e) => set('catatan')(e.target.value)} /></Field>
+      {!awal && (
+        <button type="button" className="block text-sm text-primary hover:underline" onClick={() => setLengkap(!lengkap)}>
+          {lengkap ? 'Sembunyikan data tambahan' : 'Isi data tambahan (merek, tahun, pemegang, jadwal servis, dll.)'}
+        </button>
+      )}
       <button className="btn" onClick={simpan}>{awal ? 'Simpan perubahan' : 'Tambah motor'}</button>
     </div>
   )
