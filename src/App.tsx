@@ -19,7 +19,7 @@ const SUPER: Tab[] = [
   { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di semua DS', Icon: LayoutDashboard, View: () => <Dashboard /> },
   { nama: 'Data Rider', desc: 'Atur rider: pindahkan ke DS lain, ubah status aktif/nonaktif, import dan unduh CSV', Icon: Users, View: DataRider },
   { nama: 'Jadwal', desc: 'Lihat dan susun jadwal DS mana pun. Biasanya disusun Captain; Super-admin bisa membantu kapan saja.', Icon: CalendarDays, View: () => <JadwalSemua editable /> },
-  { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS per minggu. Hanya Super-admin dan Arcon yang bisa melihatnya.', Icon: ListChecks, View: () => <DaftarJadwal /> },
+  { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS per minggu. Hanya Super-admin dan Arcon yang bisa melihatnya.', Icon: ListChecks, View: () => <DaftarJadwal bolehHapus /> },
   { nama: 'Laporan Absensi Harian', desc: 'Isi atau koreksi absensi rider di DS mana pun', Icon: ClipboardCheck, View: () => <AbsensiSemua /> },
   { nama: 'Rekap Kehadiran', desc: 'Bandingkan jadwal dengan kehadiran sebenarnya, lihat rekap per rider, dan kunci absensi mingguan', Icon: ClipboardList, View: Rekap },
   { nama: 'Kelola DS & Captain', desc: 'Buat DS, atur kuota rider, pilih Captain, dan tambah Super-admin', Icon: Building2, View: () => <Kelola /> },
