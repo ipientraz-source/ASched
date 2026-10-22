@@ -1,8 +1,8 @@
 // Daftar Jadwal: jadwal tersimpan semua DS, satu baris per DS per minggu. Hanya Super-admin dan Arcon
 // (Arcon otomatis hanya melihat DS yang dipegang: dibatasi di database). Captain memakai tab Jadwal DS.
 import { useState } from 'react'
-import { X } from 'lucide-react'
-import { sb, useRows, today, addDays, monday, Err, Kosong, Select, usePage, Pagination, type Ds } from './lib'
+import { Trash2, X } from 'lucide-react'
+import { sb, useRows, today, addDays, monday, ok, toast, konfirmasi, Err, Kosong, Select, usePage, Pagination, type Ds } from './lib'
 import { JadwalGrid } from './jadwal'
 
 type Baris = { ds_id: string; ds_nama: string; minggu: string; rider: number; shift: number; libur_kunci: number }
@@ -15,7 +15,7 @@ const RENTANG = [
 ]
 const tgl = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('id-ID', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 
-export function DaftarJadwal() {
+export function DaftarJadwal({ bolehHapus = false }: { bolehHapus?: boolean }) {
   const [rentang, setRentang] = useState('28')
   const [dsId, setDsId] = useState('semua')
   const [sel, setSel] = useState<{ ds: Ds; senin: string } | null>(null)
@@ -28,6 +28,17 @@ export function DaftarJadwal() {
   const tampil = r.rows.filter((x) => dsId === 'semua' || x.ds_id === dsId)
   const pg = usePage(tampil, [rentang, dsId])
   const sekarang = monday(today())
+
+  // Super-admin: hapus jadwal tersimpan satu DS satu minggu (mis. ada rider baru padahal Captain sudah menyimpan); Captain bisa menyusun ulang
+  const hapus = async (x: Baris) => {
+    const periode = `${tgl(x.minggu)} – ${tgl(addDays(x.minggu, 6))} ${x.minggu.slice(0, 4)}`
+    if (!(await konfirmasi(`Jadwal ${x.ds_nama} untuk minggu ${periode} (${x.shift} shift, ${x.rider} rider) akan dihapus. Captain atau Super-admin bisa menyusunnya lagi. Kebutuhan harian tidak ikut terhapus. Tindakan ini tidak bisa dibatalkan.`, { judul: 'Hapus jadwal minggu ini?', ya: 'Hapus jadwal', bahaya: true }))) return
+    if (await ok(sb.rpc('hapus_jadwal', { p_ds: x.ds_id, p_minggu: x.minggu }))) {
+      toast.ok(`Jadwal ${x.ds_nama} minggu ${periode} dihapus.`)
+      if (sel?.ds.id === x.ds_id && sel.senin === x.minggu) setSel(null)
+      r.reload()
+    }
+  }
 
   return (
     <div>
@@ -66,8 +77,11 @@ export function DaftarJadwal() {
                     <td className="font-mono">{x.shift}</td>
                     <td className="font-mono text-muted-foreground">{x.libur_kunci}</td>
                     <td><span className={`badge ${x.minggu === sekarang ? 'bg-primary-soft text-primary-soft-foreground' : x.minggu > sekarang ? 'bg-warning-soft text-warning' : 'bg-muted text-muted-foreground'}`}>{x.minggu === sekarang ? 'Minggu ini' : x.minggu > sekarang ? 'Akan datang' : 'Sudah lewat'}</span></td>
-                    <td className="text-right">
+                    <td className="whitespace-nowrap text-right">
                       <button className="btn2" disabled={!ds} onClick={() => ds && setSel({ ds, senin: x.minggu })}>{dipilih ? 'Sedang dibuka' : 'Lihat jadwal'}</button>
+                      {bolehHapus && (
+                        <button className="btn2 ml-2 !px-2.5 text-danger" onClick={() => hapus(x)} title="Hapus jadwal minggu ini" aria-label={`Hapus jadwal ${x.ds_nama} minggu ${tgl(x.minggu)}`}><Trash2 size={15} /></button>
+                      )}
                     </td>
                   </tr>
                 )
@@ -78,7 +92,7 @@ export function DaftarJadwal() {
         {!tampil.length && <Kosong teks="Belum ada jadwal tersimpan di rentang ini." hint="Jadwal muncul di sini setelah Captain atau Super-admin menyimpannya." />}
         <div className="p-4"><Pagination {...pg} /></div>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">Halaman ini hanya untuk Super-admin dan Arcon. Arcon hanya melihat DS yang dipegang. Captain hanya bisa melihat jadwal DS-nya sendiri.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Halaman ini hanya untuk Super-admin dan Arcon. Arcon hanya melihat DS yang dipegang. Captain hanya bisa melihat jadwal DS-nya sendiri. Super-admin bisa menghapus jadwal satu minggu (ikon tempat sampah) selama absensi minggu itu belum diisi atau dikunci.</p>
     </div>
   )
 }
