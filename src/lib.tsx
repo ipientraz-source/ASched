@@ -139,30 +139,46 @@ export function Toaster() {
   )
 }
 
-// ── paginasi: maksimal 10 baris per halaman ──
-export const PER_HALAMAN = 10
+// ── paginasi: pilihan jumlah baris per halaman (10 / 20 / 50 / 100), pilihan diingat di perangkat ──
+export const UKURAN_HALAMAN = [10, 20, 50, 100]
+const ukuranTersimpan = () => {
+  const n = Number(store.get('per_halaman'))
+  return UKURAN_HALAMAN.includes(n) ? n : UKURAN_HALAMAN[0]
+}
 export function usePage<T>(rows: T[], resetKey: unknown[] = []) {
   const [hal, setHal] = useState(1)
-  const total = Math.max(1, Math.ceil(rows.length / PER_HALAMAN))
+  const [ukuran, setUkuranState] = useState(ukuranTersimpan)
+  const setUkuran = (n: number) => {
+    store.set('per_halaman', String(n))
+    setUkuranState(n)
+    setHal(1)
+  }
+  const total = Math.max(1, Math.ceil(rows.length / ukuran))
   const aktif = Math.min(hal, total)
   // kembali ke halaman 1 saat pencarian / filter berubah
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setHal(1), resetKey)
-  return { rows: rows.slice((aktif - 1) * PER_HALAMAN, aktif * PER_HALAMAN), hal: aktif, total, jumlah: rows.length, setHal }
+  return { rows: rows.slice((aktif - 1) * ukuran, aktif * ukuran), hal: aktif, total, jumlah: rows.length, setHal, ukuran, setUkuran }
 }
 
-export function Pagination({ hal, total, jumlah, setHal }: { hal: number; total: number; jumlah: number; setHal: (n: number) => void }) {
-  if (jumlah <= PER_HALAMAN) return null
-  const dari = (hal - 1) * PER_HALAMAN + 1
-  const sampai = Math.min(hal * PER_HALAMAN, jumlah)
+export function Pagination({ hal, total, jumlah, setHal, ukuran, setUkuran }: { hal: number; total: number; jumlah: number; setHal: (n: number) => void; ukuran: number; setUkuran: (n: number) => void }) {
+  if (jumlah <= UKURAN_HALAMAN[0]) return null
+  const dari = (hal - 1) * ukuran + 1
+  const sampai = Math.min(hal * ukuran, jumlah)
   const awal = Math.max(1, Math.min(hal - 2, total - 4))
   const nomor = Array.from({ length: Math.min(5, total) }, (_, i) => awal + i)
   const btn = 'size-8 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 border-t border-border text-sm text-muted-foreground">
-      <span>
-        Menampilkan <b className="text-foreground">{dari}–{sampai}</b> dari <b className="text-foreground">{jumlah}</b>
-      </span>
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 border-t border-border text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span>
+          Menampilkan <b className="text-foreground">{dari}–{sampai}</b> dari <b className="text-foreground">{jumlah}</b>
+        </span>
+        <span className="flex items-center gap-2">
+          Tampilkan
+          <Select className="w-[4.5rem]" value={String(ukuran)} onChange={(v) => setUkuran(Number(v))} opsi={UKURAN_HALAMAN.map((n) => ({ value: String(n), label: String(n) }))} />
+        </span>
+      </div>
       <div className="flex items-center gap-1" role="navigation" aria-label="Halaman">
         <button className={`${btn} hover:bg-muted`} disabled={hal <= 1} onClick={() => setHal(hal - 1)} aria-label="Halaman sebelumnya"><ChevronLeft size={16} className="mx-auto" /></button>
         {nomor.map((n) => (
