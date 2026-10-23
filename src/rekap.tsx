@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { sb, today, monday, addDays, hari, useRows, ok, toast, konfirmasi, Err, Kosong, Stat, Select, usePage, Pagination, toCsv, download, type Ds, type Me } from './lib'
 import { WARNA } from './daily'
+import { Fulfillment } from './fulfillment-ui'
 import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-react'
 
 type DsRow = {
@@ -138,6 +139,7 @@ export function Dashboard() {
         <Stat icon={UserX} label="Alpha (tidak hadir tanpa kabar)" value={sum('alpha')} tone={sum('alpha') ? 'red' : 'zinc'} />
         <Stat icon={ClipboardX} label="DS belum isi absensi" value={kosong.length} tone={kosong.length ? 'red' : 'zinc'} />
       </div>
+      <Fulfillment from={from} to={to} />
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card !mb-0">
           <b className="block mb-3">Hadir sesuai jadwal per DS</b>
@@ -274,6 +276,7 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
         <button className="btn2" onClick={() => download(`actual-detail_${from}_${to}.csv`, toCsv(flat))}><Download size={14} className="inline mr-1.5 -mt-0.5" />Unduh detail absensi</button>
       </div>
       <Err msg={d.err || r.err || det.err} />
+      <Fulfillment from={from} to={to} dsId={dsId || undefined} />
       <div className="card"><DsTable rows={dsRows} /></div>
       <div className="card">
         <b>Rekap per rider</b>
