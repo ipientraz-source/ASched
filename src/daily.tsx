@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 
 type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null; potongan: boolean | null; insentif: number }
 // potongan: Ya/Tidak untuk alpha/izin/sakit; insentif: nominal rupiah untuk rider pengganti
+type TabShift = 'pagi' | 'siang' | 'lain'
 type Catat = (rider: string, status: string, backup?: string, teks?: string, potongan?: boolean | null, insentif?: number) => Promise<boolean>
 
 const rupiah = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
@@ -86,11 +87,27 @@ function DailyInner({ ds }: { ds: Ds }) {
   const shift = (id: string) => jd.rows.find((r) => r.rider_id === id && r.shift !== 'off')?.shift
   const act = (id: string) => ac.rows.find((r) => r.rider_id === id)
 
+  // Tiap rider masuk tab shift-nya. Rider pengganti (tak ada di jadwal hari itu) ikut tab shift rider yang digantikannya;
+  // kalau tidak menggantikan siapa pun, masuk tab "Lainnya".
+  const shiftTab = (id: string): TabShift => {
+    const s = shift(id) ?? shift(act(id)?.backup_untuk_id ?? '')
+    return s === 'pagi' || s === 'siang' ? s : 'lain'
+  }
   const listed = riders.rows.filter((r) => shift(r.id) || act(r.id))
-  const shown = listed.filter((r) => (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
   const terjadwal = riders.rows.filter((r) => shift(r.id))
-  const terisi = terjadwal.filter((r) => act(r.id)).length
-  const pg = usePage(shown, [q, tgl])
+  const hitung = (t: TabShift) => ({ total: terjadwal.filter((r) => shiftTab(r.id) === t).length, terisi: terjadwal.filter((r) => shiftTab(r.id) === t && act(r.id)).length })
+  const ada = (t: TabShift) => listed.some((r) => shiftTab(r.id) === t)
+  // Tab awal: shift pertama yang masih ada rider belum diabsen (pagi dulu), jadi Captain langsung di shift yang perlu dilaporkan.
+  const [pilihTab, setPilihTab] = useState<TabShift | null>(null)
+  useEffect(() => setPilihTab(null), [tgl])
+  const tabAwal: TabShift = (['pagi', 'siang'] as const).find((t) => hitung(t).terisi < hitung(t).total) ?? (ada('pagi') ? 'pagi' : ada('siang') ? 'siang' : 'pagi')
+  const tab = pilihTab ?? tabAwal
+  const dicari = q.trim().length > 0
+  // Mencari rider menelusuri semua shift sekaligus; tanpa kata kunci, hanya shift yang sedang dibuka
+  const shown = listed.filter((r) => (dicari || shiftTab(r.id) === tab) && (r.nama + (r.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
+  const total = hitung(tab).total
+  const terisiTab = hitung(tab).terisi
+  const pg = usePage(shown, [q, tgl, tab])
 
   const catat: Catat = async (rider, status, backup, teks, potongan, insentif) => {
     const done = await ok(
@@ -108,13 +125,28 @@ function DailyInner({ ds }: { ds: Ds }) {
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <input type="date" className="inp" value={tgl} max={today()} onChange={(e) => e.target.value && setTgl(e.target.value)} />
         <b>{hari(tgl)}</b>
-        <span className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="w-28 h-2 rounded-full bg-border overflow-hidden">
-            <span className="block h-full bg-primary" style={{ width: terjadwal.length ? `${(100 * terisi) / terjadwal.length}%` : '0%' }} />
-          </span>
-          <span className="font-mono">{terisi}/{terjadwal.length}</span> rider sudah diabsen
-        </span>
         <input className="inp ml-auto" placeholder="cari rider / Kode MTR" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div role="tablist" aria-label="Shift" className="mb-3 flex flex-wrap items-center gap-2">
+        {([['pagi', 'Shift Pagi'], ['siang', 'Shift Siang'], ['lain', 'Lainnya']] as const).filter(([t]) => t !== 'lain' || ada('lain')).map(([t, label]) => {
+          const h = hitung(t)
+          const lengkap = h.total > 0 && h.terisi === h.total
+          return (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setPilihTab(t)} className={`tab !px-3 ${tab === t && !dicari ? 'tab-on' : 'border border-border'}`}>
+              {label}
+              {h.total > 0 && <span className={`ml-2 font-mono text-xs ${tab === t && !dicari ? 'text-primary-foreground/80' : lengkap ? 'text-success' : 'text-muted-foreground'}`}>{h.terisi}/{h.total}{lengkap ? ' ✓' : ''}</span>}
+            </button>
+          )
+        })}
+        {!dicari && total > 0 && (
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-2 w-28 overflow-hidden rounded-full bg-border">
+              <span className="block h-full bg-primary" style={{ width: `${(100 * terisiTab) / total}%` }} />
+            </span>
+            {terisiTab}/{total} rider sudah diabsen
+          </span>
+        )}
+        {dicari && <span className="text-sm text-muted-foreground">Hasil pencarian dari semua shift</span>}
       </div>
       {locked && <p className="bg-warning-soft border border-warning/40 rounded p-2 text-sm mb-3">Absensi minggu ini sudah dikunci dan tidak bisa diubah lagi.</p>}
       <Err msg={riders.err || jd.err || ac.err} />
@@ -132,7 +164,7 @@ function DailyInner({ ds }: { ds: Ds }) {
             hapus={hapus}
           />
         ))}
-        {!shown.length && <div className="card"><Kosong teks="Tidak ada rider yang dijadwalkan di tanggal ini" hint="Susun jadwal di tab Jadwal DS, atau tambahkan rider pengganti di bawah." /></div>}
+        {!shown.length && <div className="card"><Kosong teks={dicari ? 'Tidak ada rider yang cocok' : listed.length ? `Tidak ada rider di ${tab === 'pagi' ? 'shift pagi' : tab === 'siang' ? 'shift siang' : 'tab ini'}` : 'Tidak ada rider yang dijadwalkan di tanggal ini'} hint={listed.length ? 'Coba shift lain di atas.' : 'Susun jadwal di tab Jadwal DS, atau tambahkan rider pengganti di bawah.'} /></div>}
       </div>
       <div className="mt-3"><Pagination {...pg} /></div>
       <TambahPengganti

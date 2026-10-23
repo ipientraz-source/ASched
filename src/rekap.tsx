@@ -6,6 +6,7 @@ import { CalendarDays, ClipboardX, Download, TrendingUp, UserX } from 'lucide-re
 type DsRow = {
   ds_id: string; ds_nama: string; dijadwalkan: number; terisi: number; patuh: number; alpha: number; tukar: number
   pengganti: number; belum_diisi: number; hari_belum_isi: number; terakhir_input: string | null
+  pagi_belum_isi: number; siang_belum_isi: number // hari yang shift pagi / siangnya belum diisi sama sekali
 }
 type RiderRow = {
   rider_id: string; kode_mtr: string | null; nama: string; ds_nama: string | null; dijadwalkan: number; hadir: number
@@ -21,6 +22,11 @@ const lastOfMonth = (d: string) => {
 }
 // kepatuhan = hadir sesuai jadwal / jadwal yang sudah diisi Captain
 const pct = (d: DsRow) => (d.terisi > 0 ? Math.round((100 * d.patuh) / d.terisi) + '%' : '–')
+// "pagi 2, siang 1": shift mana yang belum dilaporkan (kosong bila lengkap)
+// Sebelum migrasi 0014 dijalankan, kolom per shift belum ada: pakai hitungan per hari yang lama supaya DS yang lalai tetap terlihat
+const lama = (d: DsRow) => d.pagi_belum_isi === undefined
+const jmlBelum = (d: DsRow) => (lama(d) ? d.hari_belum_isi : d.pagi_belum_isi + d.siang_belum_isi)
+const shiftBelum = (d: DsRow) => lama(d) ? (d.hari_belum_isi ? `${d.hari_belum_isi} hari` : '') : [d.pagi_belum_isi && `pagi ${d.pagi_belum_isi} hari`, d.siang_belum_isi && `siang ${d.siang_belum_isi} hari`].filter(Boolean).join(', ')
 const jam = (s: string | null) => (s ? new Date(s).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' }) : 'belum pernah')
 
 function useRange() {
@@ -68,7 +74,7 @@ function DsTabelIsi({ rows }: { rows: DsRow[] }) {
         <thead>
           <tr>
             <th>DS</th><th>Terjadwal</th><th>Sesuai jadwal</th><th>Alpha</th><th>Tukar</th><th>Pengganti</th>
-            <th>Belum diisi</th><th>Hari belum diisi</th><th>Terakhir mengisi</th>
+            <th>Belum diisi</th><th>Shift belum diisi</th><th>Terakhir mengisi</th>
           </tr>
         </thead>
         <tbody>
@@ -76,7 +82,7 @@ function DsTabelIsi({ rows }: { rows: DsRow[] }) {
             <tr key={d.ds_id}>
               <td>{d.ds_nama}</td><td>{d.dijadwalkan}</td><td className="font-medium">{pct(d)}</td><td>{d.alpha}</td><td>{d.tukar}</td>
               <td>{d.pengganti}</td><td>{d.belum_diisi}</td>
-              <td className={d.hari_belum_isi ? 'text-danger font-medium' : ''}>{d.hari_belum_isi}</td>
+              <td className={shiftBelum(d) ? 'text-danger font-medium' : ''}>{shiftBelum(d) || '–'}</td>
               <td className="text-xs">{jam(d.terakhir_input)}</td>
             </tr>
           ))}
@@ -119,7 +125,7 @@ export function Dashboard() {
     () => sb.from('log_aktivitas').select('waktu,aksi,detail,captain:riders!log_aktivitas_captain_id_fkey(nama)').order('waktu', { ascending: false }).limit(10),
     [],
   )
-  const kosong = d.rows.filter((x) => x.hari_belum_isi > 0)
+  const kosong = d.rows.filter((x) => jmlBelum(x) > 0)
   const sum = (k: 'dijadwalkan' | 'terisi' | 'patuh' | 'alpha') => d.rows.reduce((a, x) => a + x[k], 0)
   const kepatuhan = sum('terisi') > 0 ? Math.round((100 * sum('patuh')) / sum('terisi')) + '%' : '–'
   return (
@@ -183,7 +189,7 @@ export function Dashboard() {
           <ul className="list-disc ml-5">
             {kosong.map((x) => (
               <li key={x.ds_id}>
-                {x.ds_nama}: {x.hari_belum_isi} hari belum diisi (terakhir mengisi: {jam(x.terakhir_input)})
+                {x.ds_nama}: shift belum diisi, {shiftBelum(x)} (terakhir mengisi: {jam(x.terakhir_input)})
               </li>
             ))}
           </ul>
