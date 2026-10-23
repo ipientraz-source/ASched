@@ -22,8 +22,9 @@ async function as(email, fn) {
   }
 }
 // potongan wajib dijawab untuk alpha/izin/sakit; bawaan di tes: Ya
-const catat = (tgl, rider, status, backup = null, teks = null, potongan = ['alpha', 'izin', 'sakit'].includes(status) ? true : null, insentif = 0) =>
-  q('select catat_actual($1::date, $2::uuid, $3::actual_status_t, $4::uuid, $5::text, $6::boolean, $7::int)', [tgl, rider, status, backup, teks, potongan, insentif])
+// tanpa pengganti: alpha/izin/sakit wajib punya pengganti ATAU memilih "Tidak dapat pengganti"; bawaan di tes: bila tak ada backup, pilih "Tidak dapat pengganti"
+const catat = (tgl, rider, status, backup = null, teks = null, potongan = ['alpha', 'izin', 'sakit'].includes(status) ? true : null, insentif = 0, tanpa = ['alpha', 'izin', 'sakit'].includes(status) && backup === null) =>
+  q('select catat_actual($1::date, $2::uuid, $3::actual_status_t, $4::uuid, $5::text, $6::boolean, $7::int, $8::boolean)', [tgl, rider, status, backup, teks, potongan, insentif, tanpa])
 
 before(async () => {
   await db.exec(`
@@ -131,6 +132,7 @@ test('jadwal_rider (login Kode MTR): hanya jadwal miliknya, nonaktif/ngawur koso
 
 test('Daily report: backup ter-link satu paket, validasi alasan, tanggal mendatang', async () => {
   const today = (await q('select today_wib()::text t'))[0].t
+  await db.exec(`delete from jadwal where rider_id in ('${R2}', '${R4}')`) // calon pengganti tidak boleh yang dijadwalkan masuk hari itu
   await as(A, async () => {
     await catat(today, R1, 'alpha', R2, 'dadakan')
     const rows = await q('select rider_id, status, backup_untuk_id, diinput_oleh, penjelasan from actual_harian where ds_id = $1 and tanggal = $2 order by status', [GALAXY, today])
@@ -140,7 +142,7 @@ test('Daily report: backup ter-link satu paket, validasi alasan, tanggal mendata
     await catat(today, R1, 'izin', null, 'ke rumah sakit') // ubah → paket backup lama hilang
     assert.equal((await q('select * from actual_harian where rider_id = $1 and tanggal = $2', [R2, today])).length, 0)
     await assert.rejects(catat(today, R1, 'tukar'), /wajib memilih rekan/)
-    await assert.rejects(catat(today, R1, 'hadir', R2), /Backup hanya untuk/)
+    await assert.rejects(catat(today, R1, 'hadir', R2), /Rider pengganti hanya untuk/)
     await assert.rejects(catat(today, R1, 'alpha', R3), /Backup\/rekan harus rider lain di DS Anda/)
     await assert.rejects(catat((await q('select (today_wib()+1)::text t'))[0].t, R1, 'hadir'), /mendatang/)
     await catat(today, R1, 'tukar', R2) // tukar sah dengan R2
@@ -258,9 +260,41 @@ test('Kunci periode Senin–Minggu: minggu berjalan ditolak, minggu lalu terkunc
   await assert.rejects(q('update actual_harian set status = $1 where rider_id = $2', ['alpha', R1]), /sudah dikunci/) // trigger berlaku untuk siapa pun
 })
 
+test('Pengganti wajib: alpha/izin/sakit pilih pengganti ATAU "Tidak dapat pengganti"; pengganti tidak boleh yang dijadwalkan atau sudah punya absensi', async () => {
+  const t = '2025-01-06', t2 = '2025-01-07'
+  await db.exec(`insert into jadwal (tanggal, rider_id, shift, ds_id) values ('${t}', '${R1}', 'pagi', '${GALAXY}')`)
+  const baris = (rid, tgl = t) => q('select status, potongan, insentif, tanpa_pengganti, backup_untuk_id from actual_harian where rider_id = $1 and tanggal = $2', [rid, tgl])
+  await as(A, async () => {
+    // tanpa memilih apa pun: ditolak untuk ketiga alasan
+    for (const st of ['alpha', 'izin', 'sakit']) await assert.rejects(catat(t, R1, st, null, null, true, 0, false), /Pilih rider pengganti, atau pilih/)
+    // memilih pengganti sekaligus "tidak dapat pengganti": ditolak; tanda itu hanya untuk yang tidak hadir
+    await assert.rejects(catat(t, R1, 'alpha', R2, null, true, 0, true), /tidak keduanya/)
+    await assert.rejects(catat(t, R1, 'hadir', null, null, null, 0, true), /hanya untuk alpha, izin, atau sakit/)
+    // izin dengan pengganti + insentif: baris pengganti terbentuk, insentif ikut pengganti
+    await catat(t, R1, 'izin', R2, 'ke dokter', false, 40000)
+    assert.deepEqual(await baris(R1), [{ status: 'izin', potongan: false, insentif: 0, tanpa_pengganti: false, backup_untuk_id: null }])
+    assert.deepEqual(await baris(R2), [{ status: 'pengganti', potongan: null, insentif: 40000, tanpa_pengganti: false, backup_untuk_id: R1 }])
+    // ganti ke "Tidak dapat pengganti": baris pengganti lama hilang, tanda tersimpan
+    await catat(t, R1, 'sakit', null, 'tidak ada rider yang bisa menggantikan', false)
+    assert.deepEqual(await baris(R1), [{ status: 'sakit', potongan: false, insentif: 0, tanpa_pengganti: true, backup_untuk_id: null }])
+    assert.equal((await baris(R2)).length, 0)
+  })
+  // pengganti yang dijadwalkan masuk hari itu ditolak (jadwal disiapkan di luar peran Captain)
+  await db.exec(`insert into jadwal (tanggal, rider_id, shift, ds_id) values ('${t}', '${R2}', 'siang', '${GALAXY}')`)
+  await as(A, async () => {
+    await assert.rejects(catat(t, R1, 'alpha', R2, null, true), /sudah dijadwalkan masuk/)
+    // pengganti yang sudah punya absensi lain hari itu ditolak (absensinya tidak boleh tertimpa diam-diam)
+    await catat(t2, R2, 'hadir')
+    await assert.rejects(catat(t2, R1, 'alpha', R2, null, true), /sudah punya absensi/)
+    assert.equal((await baris(R2, t2))[0].status, 'hadir')
+  })
+})
+
 test('Laporan: kepatuhan, belum diisi, hari kosong; Captain hanya DS-nya', async () => {
   const today = (await q('select today_wib()::text t'))[0].t
   const yesterday = (await q('select (today_wib()-1)::text t'))[0].t
+  // tes pengganti di atas mengosongkan jadwal R2 hari ini supaya bisa jadi pengganti; kembalikan seperti semula
+  await db.exec(`insert into jadwal (tanggal, rider_id, shift, ds_id) values ('${today}', '${R2}', 'siang', '${GALAXY}') on conflict do nothing`)
   await db.exec(`insert into jadwal (tanggal, rider_id, shift, ds_id) values ('${yesterday}', '${R2}', 'pagi', '${GALAXY}')`)
   await as(S, async () => {
     // Galaxy hari ini: jadwal R1 pagi + R2 siang; actual R1 'hadir' saja
