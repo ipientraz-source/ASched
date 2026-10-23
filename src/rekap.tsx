@@ -247,7 +247,7 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
   const r = useRows<RiderRow>(() => sb.rpc('laporan_rider', { p_dari: from, p_sampai: to }), [from, to])
   const det = useRows<Any>(() => {
     const base = sb.from('actual_harian')
-      .select('tanggal,status,penjelasan,potongan,insentif,jam_input,rider:riders!actual_harian_rider_id_fkey(nama,kode_mtr),backup:riders!actual_harian_backup_untuk_id_fkey(nama),oleh:riders!actual_harian_diinput_oleh_fkey(nama),ds(nama)')
+      .select('tanggal,status,penjelasan,potongan,insentif,jam_input,tanpa_pengganti,rider:riders!actual_harian_rider_id_fkey(nama,kode_mtr),backup:riders!actual_harian_backup_untuk_id_fkey(nama),oleh:riders!actual_harian_diinput_oleh_fkey(nama),ds(nama)')
       .gte('tanggal', from).lte('tanggal', to).order('tanggal', { ascending: false }).limit(1000)
     return dsId ? base.eq('ds_id', dsId) : base
   }, [from, to, dsId])
@@ -256,7 +256,7 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
   const rRows = r.rows.filter((x) => (!dsNama || x.ds_nama === dsNama) && (x.nama + (x.kode_mtr ?? '')).toLowerCase().includes(q.toLowerCase()))
   const flat = det.rows.map((x: Any) => ({
     tanggal: x.tanggal, ds: x.ds?.nama, kode_mtr: x.rider?.kode_mtr, rider: x.rider?.nama, status: x.status,
-    pengganti_untuk_atau_backup: x.backup?.nama ?? '', potongan: x.potongan === true ? 'ya' : x.potongan === false ? 'tidak' : '', insentif: x.insentif ?? 0, penjelasan: x.penjelasan ?? '', diinput_oleh: x.oleh?.nama ?? '', jam_input: x.jam_input,
+    pengganti_untuk_atau_backup: x.backup?.nama ?? '', tanpa_pengganti: x.tanpa_pengganti ? 'ya' : '', potongan: x.potongan === true ? 'ya' : x.potongan === false ? 'tidak' : '', insentif: x.insentif ?? 0, penjelasan: x.penjelasan ?? '', diinput_oleh: x.oleh?.nama ?? '', jam_input: x.jam_input,
   }))
 
   const pgR = usePage(rRows, [q, dsId, from, to])
@@ -302,7 +302,7 @@ export function Rekap({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsList?:
           <tbody>
             {pgD.rows.map((x: Any, i: number) => (
               <tr key={i}>
-                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama}</td><td>{x.potongan === true ? 'Ya' : x.potongan === false ? 'Tidak' : '–'}</td><td>{x.insentif ? `Rp ${Number(x.insentif).toLocaleString('id-ID')}` : '–'}</td><td>{x.penjelasan}</td>
+                <td>{x.tanggal}</td><td>{x.ds?.nama}</td><td>{x.rider?.nama}</td><td><span className={`badge ${WARNA[x.status]}`}>{x.status}</span></td><td>{x.backup?.nama ?? (x.tanpa_pengganti ? <span className="badge bg-warning-soft text-warning">Tanpa pengganti</span> : null)}</td><td>{x.potongan === true ? 'Ya' : x.potongan === false ? 'Tidak' : '–'}</td><td>{x.insentif ? `Rp ${Number(x.insentif).toLocaleString('id-ID')}` : '–'}</td><td>{x.penjelasan}</td>
                 <td className="text-xs">{x.oleh?.nama} · {jam(x.jam_input)}</td>
               </tr>
             ))}

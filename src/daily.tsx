@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { sb, today, monday, hari, useRows, ok, toast, Err, Kosong, RiderPick, Select, usePage, Pagination, type Ds, type Me, type Rider } from './lib'
 
-type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null; potongan: boolean | null; insentif: number }
+type Act = { rider_id: string; status: string; backup_untuk_id: string | null; penjelasan: string | null; potongan: boolean | null; insentif: number; tanpa_pengganti: boolean }
 // potongan: Ya/Tidak untuk alpha/izin/sakit; insentif: nominal rupiah untuk rider pengganti
 type TabShift = 'pagi' | 'siang' | 'lain'
-type Catat = (rider: string, status: string, backup?: string, teks?: string, potongan?: boolean | null, insentif?: number) => Promise<boolean>
+type Catat = (rider: string, status: string, backup?: string, teks?: string, potongan?: boolean | null, insentif?: number, tanpa?: boolean) => Promise<boolean>
 
 const rupiah = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const angka = (s: string) => parseInt(s.replace(/\D/g, ''), 10) || 0
@@ -75,7 +75,7 @@ function DailyInner({ ds }: { ds: Ds }) {
   const riders = useRows<Rider>(() => sb.from('riders').select('*').eq('ds_id', ds.id).eq('status', 'aktif').order('nama'), [ds.id])
   const jd = useRows<{ rider_id: string; shift: string }>(() => sb.from('jadwal').select('rider_id,shift').eq('ds_id', ds.id).eq('tanggal', tgl), [ds.id, tgl])
   const ac = useRows<Act>(
-    () => sb.from('actual_harian').select('rider_id,status,backup_untuk_id,penjelasan,potongan,insentif').eq('ds_id', ds.id).eq('tanggal', tgl),
+    () => sb.from('actual_harian').select('rider_id,status,backup_untuk_id,penjelasan,potongan,insentif,tanpa_pengganti').eq('ds_id', ds.id).eq('tanggal', tgl),
     [ds.id, tgl],
   )
   const lock = useRows<{ minggu_mulai: string }>(
@@ -108,15 +108,21 @@ function DailyInner({ ds }: { ds: Ds }) {
   const total = hitung(tab).total
   const terisiTab = hitung(tab).terisi
   const pg = usePage(shown, [q, tgl, tab])
+  // Rider pengganti milik seorang rider yang tidak hadir; calon pengganti = rider lain yang hari itu tidak dijadwalkan masuk
+  // dan belum punya absensi lain (aturan yang sama dipaksakan di database)
+  const penggantiDari = (id: string) => ac.rows.find((a) => a.status === 'pengganti' && a.backup_untuk_id === id)
+  const calonPengganti = (id: string) => riders.rows.filter((x) => x.id !== id && !shift(x.id) && (!act(x.id) || (act(x.id)!.status === 'pengganti' && act(x.id)!.backup_untuk_id === id)))
 
-  const catat: Catat = async (rider, status, backup, teks, potongan, insentif) => {
+  const catat: Catat = async (rider, status, backup, teks, potongan, insentif, tanpa) => {
+    setPilihTab((t) => t ?? tab) // kunci tab yang sedang dibuka: selesai mengabsen satu shift tidak langsung memindahkan layar ke shift lain
     const done = await ok(
-      sb.rpc('catat_actual', { p_tanggal: tgl, p_rider: rider, p_status: status, p_backup: backup || null, p_penjelasan: teks || null, p_potongan: potongan ?? null, p_insentif: insentif ?? 0 }),
+      sb.rpc('catat_actual', { p_tanggal: tgl, p_rider: rider, p_status: status, p_backup: backup || null, p_penjelasan: teks || null, p_potongan: potongan ?? null, p_insentif: insentif ?? 0, p_tanpa_pengganti: tanpa ?? false }),
     )
     if (done) ac.reload()
     return done
   }
   const hapus = async (rider: string) => {
+    setPilihTab((t) => t ?? tab)
     if (await ok(sb.rpc('hapus_actual', { p_tanggal: tgl, p_rider: rider }))) ac.reload()
   }
 
@@ -159,6 +165,8 @@ function DailyInner({ ds }: { ds: Ds }) {
             act={act(r.id)}
             nama={nama}
             rekan={riders.rows.filter((x) => x.id !== r.id)}
+            pengganti={penggantiDari(r.id)}
+            calon={calonPengganti(r.id)}
             locked={locked}
             catat={catat}
             hapus={hapus}
@@ -178,13 +186,15 @@ function DailyInner({ ds }: { ds: Ds }) {
 }
 
 function Baris({
-  r, shift, act, nama, rekan, locked, catat, hapus,
+  r, shift, act, nama, rekan, pengganti, calon, locked, catat, hapus,
 }: {
   r: Rider
   shift?: string
   act?: Act
   nama: (id: string | null) => string
-  rekan: Rider[]
+  rekan: Rider[] // rekan tukar shift
+  pengganti?: Act // baris pengganti milik rider ini (kalau ada)
+  calon: Rider[] // calon rider pengganti
   locked: boolean
   catat: Catat
   hapus: (id: string) => void
@@ -193,26 +203,29 @@ function Baris({
   const lama = act && ['alpha', 'izin', 'sakit', 'tukar'].includes(act.status) ? act : undefined
   const [buka, setBuka] = useState(false)
   const [alasan, setAlasan] = useState(lama?.status ?? 'alpha')
-  const [backup, setBackup] = useState(lama?.backup_untuk_id ?? '')
+  const [backup, setBackup] = useState(pengganti?.rider_id ?? '')
+  // alpha/izin/sakit: pilih rider pengganti ('ada') ATAU "Tidak dapat pengganti" ('tidak'). Tanpa calon sama sekali, bawaannya 'tidak'.
+  const [adaPengganti, setAdaPengganti] = useState(lama ? !lama.tanpa_pengganti : calon.length > 0)
   const [teks, setTeks] = useState(lama?.penjelasan ?? '')
   const [potongan, setPotongan] = useState(lama ? (lama.potongan === true || (lama.potongan == null && lama.status === 'alpha') ? 'ya' : 'tidak') : 'ya') // saran awal: Alpha = Ya, Izin/Sakit = Tidak; Captain bisa mengubah
-  const [ins, setIns] = useState(!!lama?.insentif)
-  const [nominal, setNominal] = useState(lama?.insentif ? String(lama.insentif) : '')
+  const [ins, setIns] = useState(!!pengganti?.insentif)
+  const [nominal, setNominal] = useState(pengganti?.insentif ? String(pengganti.insentif) : '')
 
   const gantiAlasan = (v: string) => {
     setAlasan(v)
     setPotongan(v === 'alpha' ? 'ya' : 'tidak')
-    if (v !== 'alpha') {
-      setIns(false)
-      setNominal('')
-    }
+    setBackup('') // tukar memilih dari rekan, selain itu dari calon pengganti: daftarnya berbeda
+    setIns(false)
+    setNominal('')
   }
   const simpan = async () => {
     if (alasan === 'tukar' && !backup) return toast('Pilih rekan yang bertukar')
-    const adaIns = alasan === 'alpha' && !!backup && ins
+    if (alasan !== 'tukar' && adaPengganti && !backup) return toast('Pilih rider pengganti, atau pilih "Tidak dapat pengganti"')
+    const pakaiPengganti = alasan === 'tukar' || adaPengganti
+    const adaIns = alasan !== 'tukar' && adaPengganti && !!backup && ins
     if (adaIns && angka(nominal) <= 0) return toast('Isi nominal insentif lebih dari 0')
     const pot = alasan === 'tukar' ? undefined : potongan === 'ya'
-    if (await catat(r.id, alasan, alasan === 'alpha' || alasan === 'tukar' ? backup : undefined, teks, pot, adaIns ? angka(nominal) : 0)) setBuka(false)
+    if (await catat(r.id, alasan, pakaiPengganti ? backup : undefined, teks, pot, adaIns ? angka(nominal) : 0, alasan !== 'tukar' && !adaPengganti)) setBuka(false)
   }
 
   return (
@@ -228,6 +241,8 @@ function Baris({
             {act.status === 'pengganti' && act.backup_untuk_id ? ` untuk ${nama(act.backup_untuk_id)}` : ''}
           </span>
         )}
+        {pengganti && act && act.status !== 'pengganti' && <span className="badge bg-primary-soft text-primary-soft-foreground">Pengganti: {nama(pengganti.rider_id)}</span>}
+        {act?.tanpa_pengganti && <span className="badge bg-warning-soft text-warning">Tanpa pengganti</span>}
         {act?.potongan === true && <span className="badge bg-danger-soft text-danger">Potongan: Ya</span>}
         {act?.potongan === false && <span className="badge bg-muted text-muted-foreground">Tanpa potongan</span>}
         {!!act?.insentif && <span className="badge bg-success-soft text-success">+ Insentif {rupiah(act.insentif)}</span>}
@@ -249,11 +264,23 @@ function Baris({
       {buka && (
         <div className="mt-2 pt-2 border-t flex flex-wrap gap-2 items-center">
           <Select className="w-72 max-w-full" value={alasan} onChange={gantiAlasan} opsi={ALASAN.map(([value, label]) => ({ value, label }))} />
-          {(alasan === 'alpha' || alasan === 'tukar') && (
-            <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder={alasan === 'tukar' ? 'Rekan tukar' : 'Pengganti / backup (opsional)'} />
+          {alasan === 'tukar' && <RiderPick riders={rekan} value={backup} onChange={setBackup} placeholder="Rekan tukar" />}
+          {alasan !== 'tukar' && (
+            <div className="flex basis-full flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Rider pengganti (wajib):</span>
+              <Pilih nilai={adaPengganti ? 'ada' : 'tidak'} ubah={(v) => { setAdaPengganti(v === 'ada'); if (v !== 'ada') { setBackup(''); setIns(false); setNominal('') } }} opsi={[['ada', 'Ada pengganti'], ['tidak', 'Tidak dapat pengganti', true]]} />
+              {!adaPengganti && !calon.length && <span className="text-xs text-muted-foreground">Tidak ada rider yang bisa jadi pengganti hari ini.</span>}
+              {adaPengganti && (
+                calon.length ? (
+                  <RiderPick riders={calon} value={backup} onChange={setBackup} placeholder="Pilih rider pengganti" />
+                ) : (
+                  <span className="text-xs text-warning">Tidak ada rider yang bisa jadi pengganti hari ini (semua dijadwalkan masuk atau sudah punya absensi). Pilih "Tidak dapat pengganti".</span>
+                )
+              )}
+            </div>
           )}
           {alasan !== 'tukar' && (
-            <input className="inp flex-1 min-w-40" placeholder={alasan === 'sakit' ? 'Keterangan (opsional)' : 'Keterangan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
+            <input className="inp flex-1 min-w-40" placeholder={!adaPengganti ? 'Kenapa tidak dapat pengganti? (opsional)' : alasan === 'sakit' ? 'Keterangan (opsional)' : 'Keterangan'} value={teks} onChange={(e) => setTeks(e.target.value)} />
           )}
           {alasan !== 'tukar' && (
             <div className="flex basis-full flex-wrap items-center gap-2 text-sm">
@@ -262,7 +289,7 @@ function Baris({
               <span className="text-xs text-muted-foreground">Saran: {alasan === 'alpha' ? 'Ya' : 'Tidak'} untuk {alasan === 'alpha' ? 'tidak hadir tanpa kabar' : alasan}. Bisa diubah.</span>
             </div>
           )}
-          {alasan === 'alpha' && backup && (
+          {alasan !== 'tukar' && adaPengganti && backup && (
             <div className="flex basis-full flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">Insentif untuk pengganti?</span>
               <Pilih nilai={ins ? 'ya' : 'tidak'} ubah={(v) => { setIns(v === 'ya'); if (v !== 'ya') setNominal('') }} opsi={[['tidak', 'Tanpa insentif', true], ['ya', '+ Insentif']]} />
