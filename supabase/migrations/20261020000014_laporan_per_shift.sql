@@ -1,6 +1,6 @@
 -- Laporan absensi per shift: Captain boleh melaporkan shift pagi lebih dulu tanpa menunggu hari selesai.
 -- laporan_ds menambah dua kolom: berapa hari shift pagi dan shift siang yang BELUM diisi sama sekali (satu rider pun belum).
--- Pagi dihitung sampai hari ini; siang baru dihitung sampai kemarin, karena shift siang hari ini belum tentu selesai.
+-- Pagi dihitung sampai hari ini; siang hari ini baru dihitung setelah shift selesai (pukul 22:00 WIB), sebelum itu sampai kemarin.
 -- Kolom lama (hari_belum_isi dan lainnya) tidak berubah.
 
 drop function laporan_ds(date, date);
@@ -29,7 +29,7 @@ language sql stable as $$
        and not exists (select 1 from jadwal j2 join actual_harian a on a.tanggal = j2.tanggal and a.rider_id = j2.rider_id
                        where j2.ds_id = d.id and j2.tanggal = j.tanggal and j2.shift = 'pagi'))::int,
     (select count(distinct j.tanggal) from jadwal j where j.ds_id = d.id and j.shift = 'siang'
-       and j.tanggal between p_dari and least(p_sampai, today_wib() - 1)
+       and j.tanggal between p_dari and least(p_sampai, case when (now() at time zone 'Asia/Jakarta')::time >= time '22:00' then today_wib() else today_wib() - 1 end)
        and not exists (select 1 from jadwal j2 join actual_harian a on a.tanggal = j2.tanggal and a.rider_id = j2.rider_id
                        where j2.ds_id = d.id and j2.tanggal = j.tanggal and j2.shift = 'siang'))::int
   from ds d

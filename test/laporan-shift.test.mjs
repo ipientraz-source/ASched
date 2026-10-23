@@ -20,6 +20,8 @@ async function sebagaiSuper(fn) {
   }
 }
 const laporan = async () => (await sebagaiSuper(() => q(`select pagi_belum_isi, siang_belum_isi, hari_belum_isi from laporan_ds(today_wib() - 1, today_wib())`)))[0]
+// siang hari ini baru dihitung setelah pukul 22:00 WIB; tes ikut jam sebenarnya supaya lulus kapan pun dijalankan
+const lewat22 = async () => (await q(`select (now() at time zone 'Asia/Jakarta')::time >= time '22:00' as ya`))[0].ya
 const isi = (tgl, rider) => db.query(`insert into actual_harian (tanggal, rider_id, ds_id, status, potongan) values (${tgl}, '${rider}', '${GALAXY}', 'hadir', null)`)
 
 before(async () => {
@@ -45,23 +47,26 @@ before(async () => {
 })
 after(() => db.close())
 
-test('belum ada absensi: pagi kemarin dan hari ini terhitung belum diisi; siang hanya kemarin (siang hari ini belum tentu selesai)', async () => {
+test('belum ada absensi: pagi kemarin dan hari ini terhitung belum diisi; siang hari ini baru terhitung setelah 22:00 WIB', async () => {
   const l = await laporan()
   assert.equal(l.pagi_belum_isi, 2)
-  assert.equal(l.siang_belum_isi, 1)
+  assert.equal(l.siang_belum_isi, (await lewat22()) ? 2 : 1)
 })
 
 test('shift pagi dilaporkan lebih dulu: pagi terhitung terisi walau siang di hari yang sama belum', async () => {
   await isi('today_wib()', P1) // cukup satu rider pagi hari ini yang diabsen
   const l = await laporan()
   assert.equal(l.pagi_belum_isi, 1) // tinggal pagi kemarin
-  assert.equal(l.siang_belum_isi, 1)
+  assert.equal(l.siang_belum_isi, (await lewat22()) ? 2 : 1)
   assert.equal(l.hari_belum_isi, 1) // ukuran lama per hari: hari ini sudah ada isian, kemarin belum
 })
 
 test('pagi kemarin diisi: pagi bersih; siang kemarin masih terhitung sampai diisi', async () => {
   await isi('today_wib() - 1', P1)
-  assert.deepEqual({ ...(await laporan()) }, { pagi_belum_isi: 0, siang_belum_isi: 1, hari_belum_isi: 0 })
+  const siangHariIni = (await lewat22()) ? 1 : 0 // siang hari ini ikut terhitung setelah 22:00
+  assert.deepEqual({ ...(await laporan()) }, { pagi_belum_isi: 0, siang_belum_isi: 1 + siangHariIni, hari_belum_isi: 0 })
   await isi('today_wib() - 1', S2)
+  assert.deepEqual({ ...(await laporan()) }, { pagi_belum_isi: 0, siang_belum_isi: siangHariIni, hari_belum_isi: 0 })
+  await isi('today_wib()', S1) // siang hari ini dilaporkan: bersih kapan pun jamnya
   assert.deepEqual({ ...(await laporan()) }, { pagi_belum_isi: 0, siang_belum_isi: 0, hari_belum_isi: 0 })
 })
