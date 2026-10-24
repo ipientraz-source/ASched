@@ -94,7 +94,8 @@ export function Kelola() {
   )
 }
 
-function DsCard({ d, riders, candidates, arcons, semuaDs, reload }: { d: Ds; riders: Rider[]; candidates: Rider[]; arcons: Rider[]; semuaDs: Ds[]; reload: () => void }) {
+// terbatas = tampilan Arcon: hanya kebutuhan rider (kuota) dan Captain; tanpa nama DS, grup WhatsApp, password, dan pilihan Arcon
+function DsCard({ d, riders, candidates, arcons, semuaDs, reload, terbatas = false }: { d: Ds; riders: Rider[]; candidates: Rider[]; arcons: Rider[]; semuaDs: Ds[]; reload: () => void; terbatas?: boolean }) {
   const [arPick, setArPick] = useState('')
   const arc = riders.find((r) => r.id === d.arcon_id)
   const jmlDsArcon = arc ? semuaDs.filter((x) => x.arcon_id === arc.id).length : 0
@@ -116,20 +117,21 @@ function DsCard({ d, riders, candidates, arcons, semuaDs, reload }: { d: Ds; rid
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const cap = riders.find((r) => r.id === d.captain_id)
-  const berubah = f.nama.trim() !== d.nama || f.kuota_pagi !== d.kuota_pagi || f.kuota_siang !== d.kuota_siang || f.group_wa_id !== (d.group_wa_id ?? '')
+  const berubah = f.kuota_pagi !== d.kuota_pagi || f.kuota_siang !== d.kuota_siang || (!terbatas && (f.nama.trim() !== d.nama || f.group_wa_id !== (d.group_wa_id ?? '')))
   const angka = (v: string) => Math.max(0, Math.floor(+v || 0))
 
   const kurang = !pick ? 'Pilih rider dulu' : !email.trim() ? 'Isi email untuk login' : pw && pw.length < 8 ? 'Password minimal 8 karakter' : ''
 
   const simpan = async () => {
-    if (await ok(sb.from('ds').update({ nama: f.nama.trim(), kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang, group_wa_id: f.group_wa_id.trim() || null }).eq('id', d.id))) {
+    const isi = terbatas ? { kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang } : { nama: f.nama.trim(), kuota_pagi: f.kuota_pagi, kuota_siang: f.kuota_siang, group_wa_id: f.group_wa_id.trim() || null }
+    if (await ok(sb.from('ds').update(isi).eq('id', d.id))) {
       toast.ok('Perubahan DS disimpan')
       reload()
     }
   }
   const tunjuk = async () => {
     if (!(await ok(sb.rpc('tunjuk_captain', { p_ds: d.id, p_rider: pick, p_email: email })))) return
-    if (pw) await buatAkun(email, pw)
+    if (pw && !terbatas) await buatAkun(email, pw)
     setPick('')
     setEmail('')
     setPw('')
@@ -148,22 +150,26 @@ function DsCard({ d, riders, candidates, arcons, semuaDs, reload }: { d: Ds; rid
         {arc && <span className="badge bg-muted text-foreground/80">Arcon: {arc.nama}</span>}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-start">
-        <Field label="Nama DS" hint="Dipakai di file CSV rider dan di laporan.">
-          <input className="inp w-full" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
-        </Field>
-        <Field label="Kuota shift pagi" hint="Jumlah rider yang harus masuk shift pagi setiap hari.">
+      <div className={`grid gap-4 sm:grid-cols-2 ${terbatas ? 'lg:grid-cols-2' : 'lg:grid-cols-4'} items-start`}>
+        {!terbatas && (
+          <Field label="Nama DS" hint="Dipakai di file CSV rider dan di laporan.">
+            <input className="inp w-full" value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} />
+          </Field>
+        )}
+        <Field label={terbatas ? 'Kebutuhan rider shift pagi' : 'Kuota shift pagi'} hint="Jumlah rider yang harus masuk shift pagi setiap hari.">
           <input type="number" min={0} className="inp w-full" value={f.kuota_pagi} onChange={(e) => setF({ ...f, kuota_pagi: angka(e.target.value) })} />
         </Field>
-        <Field label="Kuota shift siang" hint="Jumlah rider yang harus masuk shift siang setiap hari.">
+        <Field label={terbatas ? 'Kebutuhan rider shift siang' : 'Kuota shift siang'} hint="Jumlah rider yang harus masuk shift siang setiap hari.">
           <input type="number" min={0} className="inp w-full" value={f.kuota_siang} onChange={(e) => setF({ ...f, kuota_siang: angka(e.target.value) })} />
         </Field>
-        <Field label="ID grup WhatsApp (opsional)" hint="Untuk pengingat jadwal ke grup nanti. Boleh dikosongkan.">
-          <input className="inp w-full" placeholder="Contoh: 1203630xxxx@g.us" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} />
-        </Field>
+        {!terbatas && (
+          <Field label="ID grup WhatsApp (opsional)" hint="Untuk pengingat jadwal ke grup nanti. Boleh dikosongkan.">
+            <input className="inp w-full" placeholder="Contoh: 1203630xxxx@g.us" value={f.group_wa_id} onChange={(e) => setF({ ...f, group_wa_id: e.target.value })} />
+          </Field>
+        )}
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <button className="btn" disabled={!berubah || !f.nama.trim()} onClick={simpan}>Simpan perubahan</button>
+        <button className="btn" disabled={!berubah || (!terbatas && !f.nama.trim())} onClick={simpan}>Simpan perubahan</button>
         {!berubah && <span className="text-xs text-muted-foreground">Belum ada yang diubah</span>}
       </div>
 
@@ -180,16 +186,20 @@ function DsCard({ d, riders, candidates, arcons, semuaDs, reload }: { d: Ds; rid
           <Field label="Email untuk login" hint="Captain memakai email ini untuk masuk ke aplikasi.">
             <input className="inp w-full" type="email" placeholder="nama@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
-          <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
-            <input className="inp w-full" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
-          </Field>
+          {!terbatas && (
+            <Field label="Password (opsional)" hint="Minimal 8 karakter. Kosongkan kalau akun login sudah dibuat sendiri di Supabase.">
+              <input className="inp w-full" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+            </Field>
+          )}
         </div>
+        {terbatas && <p className="mt-2 text-xs text-muted-foreground">Captain membuat password sendiri lewat "Lupa password / buat password?" di layar masuk, memakai email di atas. Calon Captain hanya dari rider DS ini.</p>}
         <div className="mt-3 flex items-center gap-3">
           <button className="btn2" disabled={!!kurang} onClick={tunjuk}>{cap ? 'Ganti Captain' : 'Jadikan Captain'}</button>
           {kurang && <span className="text-xs text-muted-foreground">{kurang}</span>}
         </div>
       </div>
 
+      {!terbatas && (
       <div className="mt-5 pt-4 border-t border-border">
         <b className="block">{arc ? 'Ganti Arcon' : 'Pilih Arcon (opsional)'}</b>
         <p className="text-sm text-muted-foreground mb-3">
@@ -207,6 +217,30 @@ function DsCard({ d, riders, candidates, arcons, semuaDs, reload }: { d: Ds; rid
           {kurangArcon && <span className="text-xs text-muted-foreground">{kurangArcon}</span>}
         </div>
       </div>
+      )}
+    </div>
+  )
+}
+
+// Tampilan Arcon: hanya DS yang dipegang; mengatur kebutuhan rider per shift dan menunjuk Captain dari rider DS itu
+export function KelolaArcon({ dsList }: { dsList: Ds[] }) {
+  const dsl = useRows<Ds>(() => sb.from('ds').select('*').order('nama'), [])
+  const rs = useRows<Rider>(() => sb.from('riders').select('*').order('nama').limit(1000), [])
+  const milik = dsl.rows.filter((d) => dsList.some((x) => x.id === d.id))
+  const calon = rs.rows.filter((r) => (r.peran === 'rider' || r.peran === 'captain') && r.status === 'aktif')
+  return (
+    <div>
+      <Err msg={dsl.err || rs.err} />
+      <div className="card !bg-primary-soft !border-primary/20">
+        <b className="block mb-1">Yang bisa Anda atur di sini</b>
+        <p className="text-sm text-muted-foreground">
+          Untuk DS yang Anda pegang: berapa rider yang harus masuk tiap shift setiap hari, dan siapa Captain-nya. Membuat DS baru, mengganti nama DS, dan memilih Arcon dilakukan Super-admin.
+        </p>
+      </div>
+      {milik.map((d) => (
+        <DsCard key={d.id} d={d} terbatas riders={rs.rows} candidates={calon.filter((r) => r.ds_id === d.id)} arcons={[]} semuaDs={milik} reload={() => { dsl.reload(); rs.reload() }} />
+      ))}
+      {!milik.length && <div className="card text-center text-muted-foreground text-sm">{dsl.rows.length ? 'Anda belum memegang DS mana pun.' : 'Memuat…'}</div>}
     </div>
   )
 }
