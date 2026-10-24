@@ -203,7 +203,7 @@ function DsCard({ d, riders, candidates, arcons, semuaDs, reload, terbatas = fal
       <div className="mt-5 pt-4 border-t border-border">
         <b className="block">{arc ? 'Ganti Arcon' : 'Pilih Arcon (opsional)'}</b>
         <p className="text-sm text-muted-foreground mb-3">
-          Arcon adalah atasan Captain dari tim yang ditunjuk khusus, bukan rider. Satu Arcon bisa dipilih di banyak DS. Arcon hanya memantau (dashboard, rider, jadwal, laporan) dan bisa mengunci absensi mingguan.{' '}
+          Arcon adalah atasan Captain dari tim yang ditunjuk khusus, bukan rider. Satu Arcon bisa dipilih di banyak DS. Arcon memantau (dashboard, rider, jadwal, laporan), menyusun jadwal termasuk otomatis, mengatur kebutuhan rider dan Captain, menonaktifkan rider, dan mengunci absensi mingguan di DS yang dipegang. Absensi harian tetap dikerjakan Captain.{' '}
           {arc && <>Arcon sekarang: <b className="text-foreground">{arc.nama}</b> ({arc.email}), memegang {jmlDsArcon} DS.</>}
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
