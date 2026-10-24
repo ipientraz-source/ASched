@@ -85,7 +85,11 @@ test('Status Arcon dan Captain hanya bisa diubah Super-admin; Captain tetap bisa
     assert.equal((await ubah(R_CA, 'nonaktif')).length, 0) // Captain DS lain: tak terlihat, tak terubah
   })
   await as(AA, async () => {
-    assert.equal((await ubah(R_CG, 'nonaktif')).length, 0) // Arcon tak punya hak tulis
+    await assert.rejects(ubah(R_CG, 'nonaktif'), /Hanya Super-admin yang boleh mengubah status Arcon dan Captain/) // Captain di DS yang dipegang: tetap hanya Super-admin
+    assert.equal((await ubah(R_G, 'nonaktif')).length, 1) // rider di DS yang dipegang: boleh dinonaktifkan Arcon (mis. sudah tidak jalan)
+    assert.equal((await ubah(R_G, 'aktif')).length, 1) // dan diaktifkan lagi
+    assert.equal((await ubah(R_W, 'nonaktif')).length, 0) // rider di DS yang tidak dipegang: tak terlihat, tak terubah
+    await assert.rejects(q("update riders set nama = 'x' where id = $1", [R_G]), /hanya boleh mengubah status rider/) // data lain tetap tidak boleh
   })
   await as(S, async () => {
     assert.equal((await ubah(R_CG, 'nonaktif')).length, 1)
@@ -120,7 +124,7 @@ test('Arcon hanya memantau: tidak bisa menyusun jadwal, mengisi absensi, tarik r
     await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, '[]']), /Hanya Captain DS ini/)
     await assert.rejects(q('select tarik_rider($1::uuid)', [id(24)]), /Hanya Captain/)
     await assert.rejects(q("insert into actual_harian (tanggal, rider_id, ds_id, status) values (today_wib(), $1, $2, 'alpha')", [R_G, GALAXY]), /row-level security/)
-    assert.equal((await q("update riders set status = 'nonaktif' where id = $1 returning id", [R_G])).length, 0)
+    await assert.rejects(q("update riders set ds_id = null where id = $1", [R_G]), /hanya boleh mengubah status rider/) // memindahkan rider tetap bukan hak Arcon
     await assert.rejects(q("update ds set nama = 'X' where id = $1", [GALAXY]), /hanya boleh mengubah kebutuhan rider/) // nama DS tetap bukan hak Arcon
     await assert.rejects(q("select pilih_arcon($1::uuid, $2::uuid)", [GOWA, R_AA]), /Hanya Super-admin/)
     await assert.rejects(q('select lepas_arcon($1::uuid)', [GALAXY]), /Hanya Super-admin/)

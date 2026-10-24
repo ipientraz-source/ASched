@@ -21,6 +21,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
   const pg = usePage(shown, [q, fds])
 
   const setStatus = async (r: Rider) => {
+    if (r.status === 'aktif' && !(await konfirmasi(`${r.nama} tidak akan muncul di jadwal baru dan tidak bisa masuk dengan Kode MTR. Bisa diaktifkan lagi kapan saja.`, { judul: 'Nonaktifkan rider ini?', ya: 'Nonaktifkan', bahaya: true }))) return
     if (await ok(sb.from('riders').update({ status: r.status === 'aktif' ? 'nonaktif' : 'aktif' }).eq('id', r.id))) rs.reload()
   }
   const setDs = async (r: Rider, ds_id: string) => {
@@ -70,7 +71,7 @@ export function DataRider({ me, ds, dsList = [] }: { me: Me; ds: Ds | null; dsLi
                 </td>
                 <td><span className="badge bg-muted text-foreground/80 capitalize">{r.peran.replace('_', '-')}</span></td>
                 <td>
-                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && (r.ds_id !== ds?.id || r.peran !== 'rider')} title={!sup && r.peran !== 'rider' ? 'Hanya Super-admin yang bisa mengubah status Arcon dan Captain' : undefined} onClick={() => setStatus(r)}>
+                  <button className={r.status === 'aktif' ? 'btn2 capitalize text-success' : 'btn2 capitalize text-muted-foreground'} disabled={!sup && (!(r.ds_id && (r.ds_id === ds?.id || (me.peran === 'arcon' && dsList.some((d) => d.id === r.ds_id)))) || r.peran !== 'rider')} title={!sup && r.peran !== 'rider' ? 'Hanya Super-admin yang bisa mengubah status Arcon dan Captain' : undefined} onClick={() => setStatus(r)}>
                     {r.status}
                   </button>
                 </td>

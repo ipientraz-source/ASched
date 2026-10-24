@@ -37,7 +37,7 @@ const CAPTAIN: Tab[] = [
 // Arcon: atasan Captain, memantau beberapa DS. Hanya melihat — jadwal dan absensi tetap dikerjakan Captain.
 const ARCON: Tab[] = [
   { nama: 'Dashboard', desc: 'Ringkasan kehadiran rider dan keaktifan Captain di DS yang Anda pegang', Icon: LayoutDashboard, View: () => <Dashboard /> },
-  { nama: 'Data Rider', desc: 'Lihat rider di DS yang Anda pegang', Icon: Users, View: DataRider },
+  { nama: 'Data Rider', desc: 'Lihat rider di DS yang Anda pegang dan nonaktifkan rider yang sudah tidak jalan', Icon: Users, View: DataRider },
   { nama: 'Jadwal', desc: 'Lihat jadwal DS yang Anda pegang. Jadwal disusun oleh Captain masing-masing.', Icon: CalendarDays, View: ({ dsList }) => <JadwalSemua daftar={dsList} /> },
   { nama: 'Daftar Jadwal', desc: 'Jadwal tersimpan semua DS yang Anda pegang, per minggu', Icon: ListChecks, View: () => <DaftarJadwal /> },
   { nama: 'Armada', desc: 'Kelola motor listrik, servis rutin, dan kerusakan di DS yang Anda pegang', Icon: Bike, View: Armada },
