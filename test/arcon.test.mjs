@@ -117,7 +117,7 @@ test('Daftar jadwal semua DS: Super-admin melihat semua, Arcon hanya DS yang dip
 test('Arcon hanya memantau: tidak bisa menyusun jadwal, mengisi absensi, tarik rider, atau menulis langsung', async () => {
   await as(AA, async () => {
     await assert.rejects(q("select catat_actual(today_wib(), $1::uuid, 'hadir')", [R_G]), /Hanya Captain/)
-    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, '[]']), /Hanya Captain DS ini/)
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GOWA, '[]']), /Arcon yang memegangnya/) // DS yang tidak dipegang
     await assert.rejects(q('select tarik_rider($1::uuid)', [id(24)]), /Hanya Captain/)
     await assert.rejects(q("insert into actual_harian (tanggal, rider_id, ds_id, status) values (today_wib(), $1, $2, 'alpha')", [R_G, GALAXY]), /row-level security/)
     assert.equal((await q("update riders set status = 'nonaktif' where id = $1 returning id", [R_G])).length, 0)
@@ -140,7 +140,7 @@ test('Arcon bisa mengunci absensi mingguan DS yang dipegang, bukan DS lain', asy
   })
 })
 
-test('Super-admin bisa menyusun jadwal DS mana pun (tercatat di log); Arcon dan Captain DS lain tetap tidak bisa', async () => {
+test('Super-admin bisa menyusun jadwal DS mana pun (tercatat di log); Arcon hanya DS yang dipegang; Captain DS lain tetap tidak bisa', async () => {
   const tgl = (await q('select today_wib()::text t'))[0].t
   const baris = JSON.stringify([{ tanggal: tgl, rider_id: R_G, shift: 'siang' }])
   await as(S, async () => {
@@ -156,10 +156,14 @@ test('Super-admin bisa menyusun jadwal DS mana pun (tercatat di log); Arcon dan 
     await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'pagi' }])]), /bukan anggota DS/)
   })
   await as(AA, async () => {
-    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, baris]), /Hanya Captain DS ini atau Super-admin/)
+    assert.equal((await q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb) n', [GALAXY, baris]))[0].n, 1) // Arcon boleh menyusun jadwal DS yang dipegang
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GOWA, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'pagi' }])]), /Arcon yang memegangnya/) // bukan DS lain
+  })
+  await as(AB, async () => {
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, baris]), /Arcon yang memegangnya/) // Arcon DS lain
   })
   await as(CG, async () => {
-    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GOWA, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'pagi' }])]), /Hanya Captain DS ini atau Super-admin/)
+    await assert.rejects(q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GOWA, JSON.stringify([{ tanggal: tgl, rider_id: R_W, shift: 'pagi' }])]), /Arcon yang memegangnya/)
     await q('select simpan_jadwal($1::uuid, today_wib(), today_wib(), $2::jsonb)', [GALAXY, baris]) // DS sendiri tetap boleh
   })
 })
@@ -197,7 +201,7 @@ test('Super-admin akses penuh absensi: isi, koreksi, hapus di DS mana pun; kunci
   })
 })
 
-test('Kuota per hari mengikuti permintaan client: Captain DS-nya / Super-admin boleh mengatur; Arcon hanya melihat', async () => {
+test('Kuota per hari mengikuti permintaan client: Captain DS-nya, Arcon yang memegang, dan Super-admin boleh mengatur', async () => {
   const d = (await q(`select (date_trunc('week', today_wib()) + interval '7 days')::date::text sen, (date_trunc('week', today_wib()) + interval '12 days')::date::text sab`))[0]
   const rows = JSON.stringify([
     { tanggal: d.sen, pagi: 1, siang: 1, cadangan: 0 }, // sama dengan bawaan Galaxy (1+1): tidak disimpan
@@ -211,7 +215,7 @@ test('Kuota per hari mengikuti permintaan client: Captain DS-nya / Super-admin b
     // simpan ulang menimpa rentang itu
     assert.equal((await atur(GALAXY, JSON.stringify([{ tanggal: d.sab, pagi: 6, siang: 2, cadangan: 0 }])))[0].n, 1)
     assert.equal((await q('select kuota_pagi from kuota_harian'))[0].kuota_pagi, 6)
-    await assert.rejects(atur(GOWA), /Hanya Captain DS ini atau Super-admin/) // DS lain
+    await assert.rejects(atur(GOWA), /Arcon yang memegangnya/) // DS lain
     await assert.rejects(atur(GALAXY, JSON.stringify([{ tanggal: d.sab, pagi: -1, siang: 1 }])), /tidak valid/)
     await assert.rejects(atur(GALAXY, JSON.stringify([{ tanggal: '2000-01-01', pagi: 2, siang: 1 }])), /tidak valid/)
     await assert.rejects(atur(GALAXY, JSON.stringify([{ tanggal: d.sab, pagi: 2, siang: 1, cadangan: -2 }])), /tidak valid/)
@@ -221,10 +225,11 @@ test('Kuota per hari mengikuti permintaan client: Captain DS-nya / Super-admin b
   })
   await as(AA, async () => {
     assert.equal((await q('select * from kuota_harian')).length, 1) // Arcon melihat kuota DS yang dipegang
-    await assert.rejects(atur(GALAXY), /Hanya Captain DS ini atau Super-admin/) // tapi tak bisa mengubah
+    assert.equal((await atur(GALAXY, JSON.stringify([{ tanggal: d.sab, pagi: 5, siang: 3, cadangan: 1 }])))[0].n, 1) // dan boleh mengatur kebutuhan harian DS yang dipegang
   })
   await as(AB, async () => {
     assert.equal((await q('select * from kuota_harian')).length, 0) // Arcon Gowa tak melihat kuota Galaxy
+    await assert.rejects(atur(GALAXY), /Arcon yang memegangnya/) // dan tak bisa mengubahnya
   })
   await as(S, async () => {
     await atur(GOWA, JSON.stringify([{ tanggal: d.sab, pagi: 4, siang: 2, cadangan: 0 }]))
